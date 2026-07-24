@@ -1,0 +1,455 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+// ─── Core Foundation Models ──────────────────────────────
+// Additional models (Task, Habit, Note, etc.) are being added
+// in Milestone 3 (Database Schema).
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+  CANCELLED
+  SKIPPED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum RecurrenceType {
+  FIXED
+  RELATIVE
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum Visibility {
+  PRIVATE
+  WORKSPACE
+  ASSIGNEES
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum ResourceType {
+  WEBSITE
+  PDF
+  YOUTUBE
+  GITHUB
+  MARKDOWN
+}
+
+enum ProjectRole {
+  OWNER
+  EDITOR
+  VIEWER
+}
+
+enum StudyBlockStatus {
+  RUNNING
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id          String  @id @default(cuid())
+  clerkId     String  @unique
+  email       String  @unique
+  displayName String
+  avatarUrl   String?
+  timezone    String  @default("UTC")
+  preferences Json    @default("{}")
+  xp          Int     @default(0)
+  level       Int     @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships   WorkspaceMember[]
+  createdTasks  Task[]            @relation("TaskCreator")
+  assignedTasks TaskAssignee[]
+  taskComments  TaskComment[]
+  activities    Activity[]
+  studyBlocks   StudyBlock[]
+
+  @@index([clerkId])
+  @@index([email])
+}
+
+model Workspace {
+  id          String  @id @default(cuid())
+  name        String
+  slug        String  @unique
+  description String?
+  avatarUrl   String?
+  settings    Json    @default("{}")
+  inviteCode  String  @unique @default(cuid())
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  members     WorkspaceMember[]
+  tasks       Task[]
+  categories  Category[]
+  projects    Project[]
+  notes       Note[]
+  habits      Habit[]
+  activities  Activity[]
+  studyBlocks StudyBlock[]
+
+  @@index([slug])
+  @@index([inviteCode])
+}
+
+model WorkspaceMember {
+  id       String        @id @default(cuid())
+  role     WorkspaceRole @default(MEMBER)
+  joinedAt DateTime      @default(now())
+  nickname String?
+  status   String        @default("ACTIVE")
+  email    String?
+
+  userId      String?
+  workspaceId String
+
+  user           User?           @relation(fields: [userId], references: [id])
+  workspace      Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projectMembers ProjectMember[]
+
+  @@index([userId])
+  @@index([workspaceId])
+  @@index([email])
+}
+
+// ─── Project Domain Models ─────────────────────────────────
+
+model Project {
+  id          String @id @default(cuid())
+  workspaceId String
+  creatorId   String
+
+  name        String
+  description String?
+  icon        String?
+  color       String?
+  coverImage  String?
+
+  status     ProjectStatus @default(ACTIVE)
+  visibility Visibility    @default(WORKSPACE)
+  isArchived Boolean       @default(false)
+  progress   Float         @default(0.0)
+  order      Int           @default(0)
+
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  members     ProjectMember[]
+  tasks       Task[]
+  resources   Resource[]
+  notes       Note[]
+  habits      Habit[]
+  activities  Activity[]
+  studyBlocks StudyBlock[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([workspaceId])
+  @@index([creatorId])
+  @@index([isArchived])
+}
+
+model ProjectMember {
+  id                String      @id @default(cuid())
+  projectId         String
+  workspaceMemberId String
+  role              ProjectRole @default(VIEWER)
+
+  project         Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  workspaceMember WorkspaceMember @relation(fields: [workspaceMemberId], references: [id], onDelete: Cascade)
+
+  joinedAt DateTime @default(now())
+
+  @@unique([projectId, workspaceMemberId])
+  @@index([workspaceMemberId])
+}
+
+model Resource {
+  id          String @id @default(cuid())
+  workspaceId String
+
+  title    String
+  url      String?
+  type     ResourceType
+  metadata Json?
+
+  projectId String?
+  taskId    String?
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task    Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  aiSummary String?                      @db.Text
+  embedding Unsupported("vector(1536)")?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([taskId])
+}
+
+// ─── Task Domain Models ────────────────────────────────────
+
+model Category {
+  id          String  @id @default(cuid())
+  name        String
+  color       String?
+  workspaceId String
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tasks     Task[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workspaceId])
+}
+
+model Task {
+  id                String       @id @default(cuid())
+  title             String
+  description       String?
+  status            TaskStatus   @default(TODO)
+  priority          TaskPriority @default(MEDIUM)
+  dueDate           DateTime?
+  estimatedDuration Int? // in minutes
+  actualDuration    Int? // in minutes
+  tags              String[]
+
+  // --- Recurrence Fields ---
+  rrule            String?
+  timezone         String?
+  recurrenceType   RecurrenceType?
+  rootTaskId       String?
+  nextOccurrenceId String?         @unique
+
+  workspaceId String
+  creatorId   String
+  categoryId  String?
+  projectId   String?
+
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  creator     User           @relation("TaskCreator", fields: [creatorId], references: [id])
+  category    Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  project     Project?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignees   TaskAssignee[]
+  resources   Resource[]
+  comments    TaskComment[]
+  notes       Note[]
+  studyBlocks StudyBlock[]
+
+  aiSummary String?                      @db.Text
+  embedding Unsupported("vector(1536)")?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([workspaceId])
+  @@index([creatorId])
+  @@index([categoryId])
+  @@index([status])
+}
+
+model TaskAssignee {
+  taskId String
+  userId String
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  assignedAt DateTime @default(now())
+
+  @@id([taskId, userId])
+  @@index([taskId])
+  @@index([userId])
+}
+
+model TaskComment {
+  id       String @id @default(cuid())
+  content  String
+  taskId   String
+  authorId String
+
+  task   Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([taskId])
+  @@index([authorId])
+}
+
+// ─── Habit Domain Models ───────────────────────────────────
+
+model Habit {
+  id          String @id @default(cuid())
+  workspaceId String
+  projectId   String
+
+  title       String
+  description String?
+  color       String?
+  icon        String?
+
+  rrule          String?
+  timezone       String?
+  recurrenceType RecurrenceType?
+
+  streak          Int       @default(0)
+  longestStreak   Int       @default(0)
+  completionCount Int       @default(0)
+  lastCompletedAt DateTime?
+  archived        Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace   Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  completions HabitCompletion[]
+  studyBlocks StudyBlock[]
+
+  @@index([workspaceId])
+  @@index([projectId])
+}
+
+model HabitCompletion {
+  id          String   @id @default(cuid())
+  habitId     String
+  completedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  habit Habit @relation(fields: [habitId], references: [id], onDelete: Cascade)
+
+  @@index([habitId])
+  @@index([completedAt])
+}
+
+// ─── Note Domain Models ────────────────────────────────────
+
+model Note {
+  id          String  @id @default(cuid())
+  workspaceId String
+  projectId   String
+  taskId      String?
+
+  title    String
+  content  String
+  isPinned Boolean @default(false)
+  order    Int     @default(0)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task      Task?     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  aiSummary String?                      @db.Text
+  embedding Unsupported("vector(1536)")?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workspaceId])
+  @@index([projectId])
+  @@index([taskId])
+}
+
+// ─── Activity & Event Models ───────────────────────────────
+
+model Activity {
+  id          String  @id @default(cuid())
+  workspaceId String
+  projectId   String?
+  userId      String
+
+  actorName  String?
+  entityType String
+  entityId   String
+  action     String
+  metadata   Json?   @default("{}")
+
+  createdAt DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@index([projectId, createdAt(sort: Desc)])
+  @@index([entityId, entityType])
+}
+
+// ─── Study Block Domain Models ──────────────────────────────
+
+model StudyBlock {
+  id          String  @id @default(cuid())
+  workspaceId String
+  projectId   String
+  taskId      String?
+  habitId     String?
+  userId      String
+
+  status          StudyBlockStatus @default(RUNNING)
+  plannedDuration Int // in minutes
+  actualDuration  Int? // in minutes
+  startedAt       DateTime         @default(now())
+  endedAt         DateTime?
+  notes           String?          @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task      Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  habit     Habit?    @relation(fields: [habitId], references: [id], onDelete: SetNull)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([projectId])
+  @@index([userId])
+  @@index([status])
+}

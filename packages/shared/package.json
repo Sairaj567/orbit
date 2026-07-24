@@ -1,0 +1,27 @@
+{
+  "name": "@orbit/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "clean": "rimraf dist .turbo",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'No lint configured yet'"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "rimraf": "^6.0.0"
+  },
+  "dependencies": {
+    "zod": "^3.24.0"
+  }
+}

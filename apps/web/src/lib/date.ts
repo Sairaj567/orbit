@@ -1,0 +1,18 @@
+export function formatRelativeTime(timestamp: string | number | Date): string {
+  const date = typeof timestamp === 'string' || typeof timestamp === 'number' ? new Date(timestamp) : timestamp;
+  const diff = Date.now() - date.getTime();
+  const minutes = Math.round(diff / 60_000);
+
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+
+  const days = Math.round(hours / 24);
+  return `${days}d ago`;
+}
+
+export function formatDate(value: string | number | Date): string {
+  return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(new Date(value));
+}

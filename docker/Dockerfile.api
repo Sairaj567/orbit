@@ -1,0 +1,39 @@
+# Stage 1: Dependencies
+FROM node:22-alpine AS deps
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
+WORKDIR /app
+
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY apps/api/package.json ./apps/api/
+COPY packages/shared/package.json ./packages/shared/
+
+RUN pnpm install --frozen-lockfile
+
+# Stage 2: Build shared
+FROM deps AS shared-build
+COPY packages/shared/ ./packages/shared/
+COPY tsconfig.base.json ./
+RUN pnpm --filter @orbit/shared build
+
+# Stage 3: Generate Prisma and build API
+FROM shared-build AS build
+COPY apps/api/ ./apps/api/
+RUN pnpm --filter @orbit/api exec prisma generate
+RUN pnpm --filter @orbit/api build
+
+# Stage 4: Production
+FROM node:22-alpine AS production
+RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
+WORKDIR /app
+
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/apps/api/dist ./apps/api/dist
+COPY --from=build /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=build /app/apps/api/prisma ./apps/api/prisma
+COPY --from=build /app/packages/shared/dist ./packages/shared/dist
+COPY --from=build /app/packages/shared/package.json ./packages/shared/
+
+ENV NODE_ENV=production
+EXPOSE 3001
+
+CMD ["node", "apps/api/dist/main.js"]
