@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { envelope } from '@orbit/shared';
 import type { PaginationDto } from '../dto';
 
 export interface CrudDelegate<
@@ -69,20 +70,20 @@ export abstract class BaseCrudService<
 
     const [data, total] = await Promise.all([
       this.delegate.findMany(findManyArgs),
-      this.delegate.count?.({ where: (args as Record<string, unknown>)?.where } as Pick<FindManyArgs, 'where'>) ?? Promise.resolve(0),
+      this.delegate.count?.({ where: (args as Record<string, unknown>)?.where } as Pick<
+        FindManyArgs,
+        'where'
+      >) ?? Promise.resolve(0),
     ]);
     const totalPages = Math.max(1, Math.ceil(total / perPage));
 
-    return {
-      data,
-      meta: {
-        page,
-        perPage,
-        total,
-        totalPages,
-        hasMore: page < totalPages,
-      },
-    };
+    return envelope(data, {
+      page,
+      perPage,
+      total,
+      totalPages,
+      hasMore: page < totalPages,
+    }) as unknown as PaginatedResult<Entity>;
   }
 
   async findUniqueOrThrow(where: WhereUniqueInput): Promise<Entity> {

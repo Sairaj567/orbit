@@ -14,7 +14,7 @@ export function useWorkspaceActivity({ workspaceId, limit = 20 }: UseWorkspaceAc
     queryKey: ['workspaces', workspaceId, 'activity'],
     queryFn: async ({ pageParam }) => {
       const token = await getToken();
-      const data = await apiClient<{ data: Activity[]; nextCursor?: string }>(
+      const res = await apiClient<{ data: Activity[]; meta?: { nextCursor?: string } }>(
         `/api/v1/workspaces/${workspaceId}/activity`,
         {
           method: 'GET',
@@ -23,11 +23,14 @@ export function useWorkspaceActivity({ workspaceId, limit = 20 }: UseWorkspaceAc
             cursor: pageParam,
           },
           headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
+            Authorization: `Bearer ${token}`,
+          },
+        },
       );
-      return data;
+      return {
+        data: res.data,
+        nextCursor: res.meta?.nextCursor,
+      };
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     initialPageParam: undefined as string | undefined,

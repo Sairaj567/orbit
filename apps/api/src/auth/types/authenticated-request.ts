@@ -27,5 +27,7 @@ export interface WorkspaceMembershipContext {
 export interface AuthenticatedRequest extends Request {
   auth?: ClerkAuthContext;
   user?: RequestUser;
+  workspace?: { id: string; slug: string; name: string };
+  workspaceId?: string;
   workspaceMembership?: WorkspaceMembershipContext;
 }

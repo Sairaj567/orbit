@@ -28,7 +28,7 @@ export class ProjectPermissionsService {
       },
       include: {
         project: true,
-      }
+      },
     });
 
     if (!projectMember) {
@@ -36,7 +36,7 @@ export class ProjectPermissionsService {
     }
 
     if (projectMember.project.workspaceId !== workspaceId) {
-       throw new ForbiddenException('Project does not belong to this workspace');
+      throw new ForbiddenException('Project does not belong to this workspace');
     }
 
     const roleOrder = { VIEWER: 0, EDITOR: 1, OWNER: 2 };
@@ -46,7 +46,28 @@ export class ProjectPermissionsService {
 
     return projectMember;
   }
-  
+
+  async requireWorkspaceRole(
+    workspaceId: string,
+    userId: string,
+    minRole: 'VIEWER' | 'MEMBER' | 'ADMIN' | 'OWNER',
+  ) {
+    const workspaceMember = await this.prisma.workspaceMember.findFirst({
+      where: { workspaceId, userId, status: 'ACTIVE' },
+    });
+
+    if (!workspaceMember) {
+      throw new ForbiddenException('You are not a member of this workspace');
+    }
+
+    const roleOrder = { VIEWER: 0, MEMBER: 1, ADMIN: 2, OWNER: 3 };
+    if (roleOrder[workspaceMember.role] < roleOrder[minRole]) {
+      throw new ForbiddenException(`You need at least ${minRole} workspace access`);
+    }
+
+    return workspaceMember;
+  }
+
   async getProjectMember(workspaceId: string, projectId: string, userId: string) {
     const workspaceMember = await this.prisma.workspaceMember.findFirst({
       where: { workspaceId, userId, status: 'ACTIVE' },

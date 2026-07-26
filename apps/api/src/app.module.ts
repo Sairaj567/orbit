@@ -17,6 +17,9 @@ import { HabitsModule } from './habits/habits.module';
 import { StudyBlocksModule } from './study-blocks/study-blocks.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { AiModule } from './ai/ai.module';
+import { WorkspacesModule } from './workspaces/workspaces.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
+import { UsersModule } from './users/users.module';
 import configuration from './config/configuration';
 import { validateEnv } from './config/env.validation';
 
@@ -30,6 +33,8 @@ import { validateEnv } from './config/env.validation';
     }),
     PrismaModule,
     RedisModule,
+    UsersModule,
+    WorkspacesModule,
     TasksModule,
     ProjectsModule,
     ProjectMembersModule,
@@ -43,6 +48,7 @@ import { validateEnv } from './config/env.validation';
     StudyBlocksModule,
     DashboardModule,
     AiModule,
+    WebhooksModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -5,6 +5,7 @@ import { ActivityService } from '../activity/activity.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import { ProjectPermissionsService } from '../project-permissions/project-permissions.service';
 import { AiService } from '../ai/ai.service';
+import { envelope } from '@orbit/shared';
 import type { CreateTaskInput, UpdateTaskInput, TaskQueryInput } from '@orbit/shared';
 
 @Injectable()
@@ -19,18 +20,27 @@ export class TasksService {
 
   async create(workspaceId: string, creatorId: string, data: CreateTaskInput) {
     if (data.projectId) {
-      await this.permissionsService.requireProjectRole(workspaceId, data.projectId, creatorId, 'EDITOR');
+      await this.permissionsService.requireProjectRole(
+        workspaceId,
+        data.projectId,
+        creatorId,
+        'EDITOR',
+      );
+    } else {
+      await this.permissionsService.requireWorkspaceRole(workspaceId, creatorId, 'MEMBER');
     }
     const { assigneeIds, ...taskData } = data;
-    
+
     const task = await this.prisma.task.create({
       data: {
         ...taskData,
         workspaceId,
         creatorId,
-        assignees: assigneeIds ? {
-          create: assigneeIds.map(userId => ({ userId }))
-        } : undefined,
+        assignees: assigneeIds
+          ? {
+              create: assigneeIds.map((userId) => ({ userId })),
+            }
+          : undefined,
       },
       include: {
         assignees: true,
@@ -62,7 +72,19 @@ export class TasksService {
   }
 
   async findAll(workspaceId: string, userId: string, query: TaskQueryInput) {
-    const { page, perPage, sortBy, sortOrder, search, status, priority, categoryId, assigneeId, projectId, tags } = query;
+    const {
+      page,
+      perPage,
+      sortBy,
+      sortOrder,
+      search,
+      status,
+      priority,
+      categoryId,
+      assigneeId,
+      projectId,
+      tags,
+    } = query;
     const skip = (page - 1) * perPage;
 
     const workspaceMember = await this.prisma.workspaceMember.findFirst({
@@ -80,8 +102,8 @@ export class TasksService {
       ...(!projectId && {
         OR: [
           { projectId: null },
-          { project: { members: { some: { workspaceMemberId: workspaceMember.id } } } }
-        ]
+          { project: { members: { some: { workspaceMemberId: workspaceMember.id } } } },
+        ],
       }),
       ...(status && { status }),
       ...(priority && { priority }),
@@ -90,15 +112,15 @@ export class TasksService {
       ...(search && {
         OR: [
           { title: { contains: search, mode: 'insensitive' as const } },
-          { description: { contains: search, mode: 'insensitive' as const } }
-        ]
+          { description: { contains: search, mode: 'insensitive' as const } },
+        ],
       }),
       ...(tags && tags.length > 0 && { tags: { hasSome: tags } }),
       ...(assigneeId && {
         assignees: {
-          some: { userId: assigneeId }
-        }
-      })
+          some: { userId: assigneeId },
+        },
+      }),
     };
 
     const [total, tasks] = await Promise.all([
@@ -114,15 +136,12 @@ export class TasksService {
       }),
     ]);
 
-    return {
-      data: tasks,
-      meta: {
-        total,
-        page,
-        perPage,
-        totalPages: Math.ceil(total / perPage),
-      },
-    };
+    return envelope(tasks, {
+      total,
+      page,
+      perPage,
+      totalPages: Math.ceil(total / perPage),
+    });
   }
 
   async findOne(workspaceId: string, userId: string, id: string) {
@@ -136,7 +155,12 @@ export class TasksService {
     }
 
     if (task.projectId) {
-      await this.permissionsService.requireProjectRole(workspaceId, task.projectId, userId, 'VIEWER');
+      await this.permissionsService.requireProjectRole(
+        workspaceId,
+        task.projectId,
+        userId,
+        'VIEWER',
+      );
     }
 
     if (!task) {
@@ -150,11 +174,27 @@ export class TasksService {
     const existingTask = await this.findOne(workspaceId, userId, id); // Ensure it exists and user has VIEWER
 
     if (existingTask.projectId) {
-      await this.permissionsService.requireProjectRole(workspaceId, existingTask.projectId, userId, 'EDITOR');
+      await this.permissionsService.requireProjectRole(
+        workspaceId,
+        existingTask.projectId,
+        userId,
+        'EDITOR',
+      );
+    } else {
+      await this.permissionsService.requireWorkspaceRole(workspaceId, userId, 'MEMBER');
     }
 
-    if (data.projectId && data.projectId !== existingTask.projectId) {
-      await this.permissionsService.requireProjectRole(workspaceId, data.projectId, userId, 'EDITOR');
+    if (data.projectId !== undefined && data.projectId !== existingTask.projectId) {
+      if (data.projectId) {
+        await this.permissionsService.requireProjectRole(
+          workspaceId,
+          data.projectId,
+          userId,
+          'EDITOR',
+        );
+      } else {
+        await this.permissionsService.requireWorkspaceRole(workspaceId, userId, 'MEMBER');
+      }
     }
 
     const { assigneeIds, ...taskData } = data;
@@ -168,12 +208,14 @@ export class TasksService {
     ) {
       try {
         const rule = RRule.fromString(existingTask.rrule);
-        
+
         let nextDate: Date | null = null;
         if (existingTask.recurrenceType === 'RELATIVE') {
           // Relative to today
           const now = new Date();
-          const ruleRelative = RRule.fromString(`DTSTART:${now.toISOString().replace(/[-:]/g, '').split('.')[0]}Z\n${existingTask.rrule}`);
+          const ruleRelative = RRule.fromString(
+            `DTSTART:${now.toISOString().replace(/[-:]/g, '').split('.')[0]}Z\n${existingTask.rrule}`,
+          );
           nextDate = ruleRelative.after(now);
         } else {
           // Fixed - find next date after today
@@ -199,8 +241,8 @@ export class TasksService {
                 recurrenceType: existingTask.recurrenceType,
                 rootTaskId: existingTask.rootTaskId || existingTask.id,
                 assignees: {
-                  create: existingTask.assignees.map(a => ({ userId: a.userId }))
-                }
+                  create: existingTask.assignees.map((a) => ({ userId: a.userId })),
+                },
               },
             });
 
@@ -211,10 +253,12 @@ export class TasksService {
                 ...taskData,
                 status: 'DONE',
                 nextOccurrenceId: clonedTask.id,
-                assignees: assigneeIds ? {
-                  deleteMany: {},
-                  create: assigneeIds.map(userId => ({ userId }))
-                } : undefined,
+                assignees: assigneeIds
+                  ? {
+                      deleteMany: {},
+                      create: assigneeIds.map((userId) => ({ userId })),
+                    }
+                  : undefined,
               },
               include: {
                 assignees: true,
@@ -234,10 +278,12 @@ export class TasksService {
       where: { id },
       data: {
         ...taskData,
-        assignees: assigneeIds ? {
-          deleteMany: {},
-          create: assigneeIds.map(userId => ({ userId }))
-        } : undefined,
+        assignees: assigneeIds
+          ? {
+              deleteMany: {},
+              create: assigneeIds.map((userId) => ({ userId })),
+            }
+          : undefined,
       },
       include: {
         assignees: true,
@@ -267,7 +313,11 @@ export class TasksService {
     }
 
     // Fire & forget embedding generation
-    this.aiService.embedEntity(updatedTask.id, 'Task', `${updatedTask.title}\n${updatedTask.description || ''}`);
+    this.aiService.embedEntity(
+      updatedTask.id,
+      'Task',
+      `${updatedTask.title}\n${updatedTask.description || ''}`,
+    );
 
     return updatedTask;
   }
@@ -276,7 +326,14 @@ export class TasksService {
     const task = await this.findOne(workspaceId, userId, id); // Ensure it exists and VIEWER
 
     if (task.projectId) {
-      await this.permissionsService.requireProjectRole(workspaceId, task.projectId, userId, 'EDITOR');
+      await this.permissionsService.requireProjectRole(
+        workspaceId,
+        task.projectId,
+        userId,
+        'EDITOR',
+      );
+    } else {
+      await this.permissionsService.requireWorkspaceRole(workspaceId, userId, 'MEMBER');
     }
 
     const deletedTask = await this.prisma.task.update({

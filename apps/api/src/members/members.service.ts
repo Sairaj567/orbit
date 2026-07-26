@@ -32,10 +32,7 @@ export class MembersService {
           },
         },
       },
-      orderBy: [
-        { role: 'asc' },
-        { joinedAt: 'asc' },
-      ],
+      orderBy: [{ role: 'asc' }, { joinedAt: 'asc' }],
     });
 
     return members;
@@ -174,7 +171,7 @@ export class MembersService {
   async remove(workspaceId: string, memberId: string, currentUserId: string) {
     const member = await this.prisma.workspaceMember.findFirst({
       where: { id: memberId, workspaceId },
-      include: { user: { select: { email: true } } }
+      include: { user: { select: { email: true } } },
     });
 
     if (!member) {
@@ -192,6 +189,10 @@ export class MembersService {
     await this.prisma.workspaceMember.delete({
       where: { id: memberId },
     });
+
+    if (member.userId) {
+      await this.realtimeService.evictWorkspaceUser(workspaceId, member.userId);
+    }
 
     this.activityService.recordActivity({
       workspaceId,

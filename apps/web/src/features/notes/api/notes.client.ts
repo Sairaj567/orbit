@@ -1,58 +1,71 @@
 import { apiClient } from '@/lib/api-client';
-import type { Note } from '@orbit/shared';
-import type { CreateNoteInput, UpdateNoteInput, NoteQueryInput } from '@orbit/shared';
+import type {
+  Note,
+  CreateNoteInput,
+  UpdateNoteInput,
+  NoteQueryInput,
+  ApiResponse,
+} from '@orbit/shared';
 
 export const NotesClient = {
-  findAll: async (workspaceId: string, query: NoteQueryInput = {}, token: string) => {
-    const params = new URLSearchParams();
-    if (query?.projectId) params.append('projectId', query.projectId);
-    if (query?.taskId) params.append('taskId', query.taskId);
-    if (query?.isPinned !== undefined) params.append('isPinned', String(query.isPinned));
-    
-    const queryString = params.toString() ? `?${params.toString()}` : '';
-    return apiClient<{ data: Note[] }>(`/api/v1/workspaces/${workspaceId}/notes${queryString}`, {
+  findAll: async (
+    workspaceId: string,
+    query: NoteQueryInput = {},
+    token: string,
+  ): Promise<ApiResponse<Note[]>> => {
+    return apiClient<ApiResponse<Note[]>>(`/api/v1/workspaces/${workspaceId}/notes`, {
       method: 'GET',
+      params: query as Record<string, string | number | boolean | string[] | number[] | undefined>,
       headers: {
-        Authorization: `Bearer ${token}`
-      }
+        Authorization: `Bearer ${token}`,
+      },
     });
   },
 
-  findOne: async (workspaceId: string, id: string, token: string) => {
-    return apiClient<{ data: Note }>(`/api/v1/workspaces/${workspaceId}/notes/${id}`, {
+  findOne: async (workspaceId: string, id: string, token: string): Promise<ApiResponse<Note>> => {
+    return apiClient<ApiResponse<Note>>(`/api/v1/workspaces/${workspaceId}/notes/${id}`, {
       method: 'GET',
       headers: {
-        Authorization: `Bearer ${token}`
-      }
+        Authorization: `Bearer ${token}`,
+      },
     });
   },
 
-  create: async (workspaceId: string, data: CreateNoteInput, token: string) => {
-    return apiClient<{ data: Note }>(`/api/v1/workspaces/${workspaceId}/notes`, {
+  create: async (
+    workspaceId: string,
+    data: CreateNoteInput,
+    token: string,
+  ): Promise<ApiResponse<Note>> => {
+    return apiClient<ApiResponse<Note>>(`/api/v1/workspaces/${workspaceId}/notes`, {
       method: 'POST',
       body: JSON.stringify(data),
       headers: {
-        Authorization: `Bearer ${token}`
-      }
+        Authorization: `Bearer ${token}`,
+      },
     });
   },
 
-  update: async (workspaceId: string, id: string, data: UpdateNoteInput, token: string) => {
-    return apiClient<{ data: Note }>(`/api/v1/workspaces/${workspaceId}/notes/${id}`, {
+  update: async (
+    workspaceId: string,
+    id: string,
+    data: UpdateNoteInput,
+    token: string,
+  ): Promise<ApiResponse<Note>> => {
+    return apiClient<ApiResponse<Note>>(`/api/v1/workspaces/${workspaceId}/notes/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
       headers: {
-        Authorization: `Bearer ${token}`
-      }
+        Authorization: `Bearer ${token}`,
+      },
     });
   },
 
-  delete: async (workspaceId: string, id: string, token: string) => {
-    return apiClient<void>(`/api/v1/workspaces/${workspaceId}/notes/${id}`, {
+  delete: async (workspaceId: string, id: string, token: string): Promise<void> => {
+    await apiClient(`/api/v1/workspaces/${workspaceId}/notes/${id}`, {
       method: 'DELETE',
       headers: {
-        Authorization: `Bearer ${token}`
-      }
+        Authorization: `Bearer ${token}`,
+      },
     });
   },
 };

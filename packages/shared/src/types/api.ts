@@ -1,7 +1,7 @@
 export interface ApiResponse<T> {
   data: T;
   meta?: ApiMeta;
-  errors: ApiError[] | null;
+  errors?: ApiError[] | null;
 }
 
 export interface ApiMeta {

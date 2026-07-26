@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { envelope } from '@orbit/shared';
 import type { CreateResourceInput, UpdateResourceInput, ResourceQueryInput } from '@orbit/shared';
 import { ActivityService } from '../activity/activity.service';
 import { RealtimeService } from '../realtime/realtime.service';
@@ -40,7 +41,14 @@ export class ResourcesService {
 
   async create(workspaceId: string, userId: string, data: CreateResourceInput) {
     if (data.projectId) {
-      await this.permissionsService.requireProjectRole(workspaceId, data.projectId, userId, 'EDITOR');
+      await this.permissionsService.requireProjectRole(
+        workspaceId,
+        data.projectId,
+        userId,
+        'EDITOR',
+      );
+    } else {
+      await this.permissionsService.requireWorkspaceRole(workspaceId, userId, 'MEMBER');
     }
     const type = data.type || this.detectResourceType(data.url);
     const title = data.title || this.extractTitle(data.url);
@@ -76,7 +84,11 @@ export class ResourcesService {
     });
 
     const description = (resource.metadata as Record<string, unknown>)?.description || '';
-    this.aiService.embedEntity(resource.id, 'Resource', `${resource.title}\n${resource.url || ''}\n${description}`);
+    this.aiService.embedEntity(
+      resource.id,
+      'Resource',
+      `${resource.title}\n${resource.url || ''}\n${description}`,
+    );
 
     return resource;
   }
@@ -99,8 +111,8 @@ export class ResourcesService {
       ...(!projectId && {
         OR: [
           { projectId: null },
-          { project: { members: { some: { workspaceMemberId: workspaceMember.id } } } }
-        ]
+          { project: { members: { some: { workspaceMemberId: workspaceMember.id } } } },
+        ],
       }),
       ...(projectId && { projectId }),
       ...(taskId && { taskId }),
@@ -116,15 +128,12 @@ export class ResourcesService {
       }),
     ]);
 
-    return {
-      data: resources,
-      meta: {
-        total,
-        page,
-        perPage,
-        totalPages: Math.ceil(total / perPage),
-      },
-    };
+    return envelope(resources, {
+      total,
+      page,
+      perPage,
+      totalPages: Math.ceil(total / perPage),
+    });
   }
 
   async findOne(workspaceId: string, userId: string, id: string) {
@@ -137,7 +146,12 @@ export class ResourcesService {
     }
 
     if (resource.projectId) {
-      await this.permissionsService.requireProjectRole(workspaceId, resource.projectId, userId, 'VIEWER');
+      await this.permissionsService.requireProjectRole(
+        workspaceId,
+        resource.projectId,
+        userId,
+        'VIEWER',
+      );
     }
 
     return resource;
@@ -147,11 +161,27 @@ export class ResourcesService {
     const resource = await this.findOne(workspaceId, userId, id); // Ensure it exists
 
     if (resource.projectId) {
-      await this.permissionsService.requireProjectRole(workspaceId, resource.projectId, userId, 'EDITOR');
+      await this.permissionsService.requireProjectRole(
+        workspaceId,
+        resource.projectId,
+        userId,
+        'EDITOR',
+      );
+    } else {
+      await this.permissionsService.requireWorkspaceRole(workspaceId, userId, 'MEMBER');
     }
 
-    if (data.projectId && data.projectId !== resource.projectId) {
-      await this.permissionsService.requireProjectRole(workspaceId, data.projectId, userId, 'EDITOR');
+    if (data.projectId !== undefined && data.projectId !== resource.projectId) {
+      if (data.projectId) {
+        await this.permissionsService.requireProjectRole(
+          workspaceId,
+          data.projectId,
+          userId,
+          'EDITOR',
+        );
+      } else {
+        await this.permissionsService.requireWorkspaceRole(workspaceId, userId, 'MEMBER');
+      }
     }
 
     const updatedResource = await this.prisma.resource.update({
@@ -185,7 +215,11 @@ export class ResourcesService {
     });
 
     const description = (updatedResource.metadata as Record<string, unknown>)?.description || '';
-    this.aiService.embedEntity(updatedResource.id, 'Resource', `${updatedResource.title}\n${updatedResource.url || ''}\n${description}`);
+    this.aiService.embedEntity(
+      updatedResource.id,
+      'Resource',
+      `${updatedResource.title}\n${updatedResource.url || ''}\n${description}`,
+    );
 
     return updatedResource;
   }
@@ -194,7 +228,14 @@ export class ResourcesService {
     const resource = await this.findOne(workspaceId, userId, id); // Ensure it exists
 
     if (resource.projectId) {
-      await this.permissionsService.requireProjectRole(workspaceId, resource.projectId, userId, 'EDITOR');
+      await this.permissionsService.requireProjectRole(
+        workspaceId,
+        resource.projectId,
+        userId,
+        'EDITOR',
+      );
+    } else {
+      await this.permissionsService.requireWorkspaceRole(workspaceId, userId, 'MEMBER');
     }
 
     const deletedResource = await this.prisma.resource.delete({

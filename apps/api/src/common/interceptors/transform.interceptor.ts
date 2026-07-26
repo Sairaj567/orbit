@@ -1,10 +1,6 @@
-import {
-  CallHandler,
-  ExecutionContext,
-  Injectable,
-  NestInterceptor,
-} from '@nestjs/common';
+import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
 import { Observable, map } from 'rxjs';
+import { isEnvelope } from '@orbit/shared';
 
 export interface ApiResponseEnvelope<T> {
   data: T;
@@ -13,23 +9,25 @@ export interface ApiResponseEnvelope<T> {
 }
 
 @Injectable()
-export class TransformInterceptor<T>
-  implements NestInterceptor<T, ApiResponseEnvelope<T>>
-{
-  intercept(
-    _context: ExecutionContext,
-    next: CallHandler<T>,
-  ): Observable<ApiResponseEnvelope<T>> {
+export class TransformInterceptor<T> implements NestInterceptor<T, ApiResponseEnvelope<T>> {
+  intercept(_context: ExecutionContext, next: CallHandler<T>): Observable<ApiResponseEnvelope<T>> {
     return next.handle().pipe(
       map((data) => {
-        // If the handler already returned an envelope shape, pass it through
-        if (
-          data !== null &&
-          typeof data === 'object' &&
-          'data' in data &&
-          'errors' in data
-        ) {
-          return data as unknown as ApiResponseEnvelope<T>;
+        if (data === null || data === undefined) {
+          return {
+            data: null as unknown as T,
+            errors: null,
+          };
+        }
+
+        // If the handler returned an explicit envelope marker, preserve envelope
+        if (isEnvelope(data)) {
+          const obj = data as { data: T; meta?: Record<string, unknown> };
+          return {
+            data: obj.data,
+            ...(obj.meta ? { meta: obj.meta } : {}),
+            errors: null,
+          };
         }
 
         return {

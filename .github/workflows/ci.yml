@@ -59,35 +59,60 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
 
-  # test:
-  #   name: Test
-  #   runs-on: ubuntu-latest
-  #   needs: lint-and-typecheck
-  #   services:
-  #     postgres:
-  #       image: postgres:17-alpine
-  #       env:
-  #         POSTGRES_USER: orbit
-  #         POSTGRES_PASSWORD: orbit_secret
-  #         POSTGRES_DB: orbit_test
-  #       ports:
-  #         - 5432:5432
-  #       options: >-
-  #         --health-cmd pg_isready
-  #         --health-interval 10s
-  #         --health-timeout 5s
-  #         --health-retries 5
-  #     redis:
-  #       image: redis:7-alpine
-  #       ports:
-  #         - 6379:6379
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: pnpm/action-setup@v4
-  #     - uses: actions/setup-node@v4
-  #       with:
-  #         node-version: 22
-  #         cache: 'pnpm'
-  #     - run: pnpm install --frozen-lockfile
-  #     - run: pnpm --filter @orbit/shared build
-  #     - run: pnpm test
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: lint-and-typecheck
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: orbit
+          POSTGRES_PASSWORD: orbit_secret
+          POSTGRES_DB: orbit_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    env:
+      DATABASE_URL: postgresql://orbit:orbit_secret@localhost:5432/orbit_test
+      DATABASE_URL_TEST: postgresql://orbit:orbit_secret@localhost:5432/orbit_test
+      REDIS_URL: redis://localhost:6379
+      NODE_ENV: test
+      CLERK_SECRET_KEY: mock_clerk_secret_key
+      CLERK_PUBLISHABLE_KEY: mock_clerk_publishable_key
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build shared package
+        run: pnpm --filter @orbit/shared build
+
+      - name: Generate Prisma Client
+        run: pnpm --filter @orbit/api exec prisma generate
+
+      - name: Deploy Prisma Migrations to Test Database
+        run: pnpm --filter @orbit/api exec prisma migrate deploy
+
+      - name: Run Unit Test Suite
+        run: pnpm test
+
+      - name: Run E2E Integration Test Suite
+        run: pnpm test:e2e

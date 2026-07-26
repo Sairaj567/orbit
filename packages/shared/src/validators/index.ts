@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { VISIBILITIES, RECURRENCE_TYPES, PROJECT_STATUSES, RESOURCE_TYPES } from '../types/enums.js';
+import {
+  VISIBILITIES,
+  RECURRENCE_TYPES,
+  PROJECT_STATUSES,
+  RESOURCE_TYPES,
+} from '../types/enums.js';
 
 export const paginationSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -8,7 +13,14 @@ export const paginationSchema = z.object({
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
 });
 
-export const taskStatusSchema = z.enum(['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE', 'CANCELLED', 'SKIPPED']);
+export const taskStatusSchema = z.enum([
+  'TODO',
+  'IN_PROGRESS',
+  'IN_REVIEW',
+  'DONE',
+  'CANCELLED',
+  'SKIPPED',
+]);
 export const taskPrioritySchema = z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']);
 
 export const createTaskSchema = z.object({
@@ -41,9 +53,6 @@ export const taskQuerySchema = paginationSchema.extend({
   projectId: z.string().cuid().optional(),
   tags: z.array(z.string()).optional(),
 });
-
-
-
 
 export const createProjectSchema = z.object({
   name: z.string().min(1).max(100),
@@ -88,8 +97,8 @@ export type ResourceQueryInput = z.infer<typeof resourceQuerySchema>;
 // ─── Note Schemas ──────────────────────────────────────────
 
 export const createNoteSchema = z.object({
-  title: z.string().min(1, "Title is required").max(100),
-  content: z.string().default(""),
+  title: z.string().min(1, 'Title is required').max(100),
+  content: z.string().default(''),
   isPinned: z.boolean().default(false),
   projectId: z.string().cuid(),
   taskId: z.string().cuid().optional().nullable(),
@@ -111,6 +120,34 @@ export const noteQuerySchema = z.object({
 
 export type NoteQueryInput = z.infer<typeof noteQuerySchema>;
 
+export const CUID_REGEX = /^c[a-z0-9]{24}$/i;
+
+export const workspaceSlugSchema = z
+  .string()
+  .min(2)
+  .max(50)
+  .transform((slug) => slug.toLowerCase())
+  .pipe(
+    z
+      .string()
+      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must contain only letters, numbers, and hyphens')
+      .refine((slug) => !CUID_REGEX.test(slug), {
+        message: 'Workspace slug cannot be formatted as a CUID string to prevent ID collisions',
+      }),
+  );
+
+export const createWorkspaceSchema = z.object({
+  name: z.string().min(1, 'Workspace name is required').max(100),
+  slug: workspaceSlugSchema,
+  description: z.string().max(1000).optional().nullable(),
+  avatarUrl: z.string().url().optional().nullable(),
+});
+
+export const updateWorkspaceSchema = createWorkspaceSchema.partial();
+
+export type CreateWorkspaceInput = z.infer<typeof createWorkspaceSchema>;
+export type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceSchema>;
+
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 export type TaskQueryInput = z.infer<typeof taskQuerySchema>;
@@ -122,3 +159,16 @@ export type ProjectQueryInput = z.infer<typeof projectQuerySchema>;
 
 export type CreateResourceInput = z.infer<typeof createResourceSchema>;
 export type UpdateResourceInput = z.infer<typeof updateResourceSchema>;
+
+export const updateUserSchema = z.object({
+  displayName: z
+    .string()
+    .trim()
+    .min(1, 'Display name cannot be empty')
+    .max(100, 'Display name must not exceed 100 characters')
+    .optional(),
+  timezone: z.string().trim().min(1, 'Timezone cannot be empty').max(100).optional(),
+  preferences: z.record(z.unknown()).optional(),
+});
+
+export type UpdateUserInput = z.infer<typeof updateUserSchema>;

@@ -4,8 +4,18 @@ export interface ApiRequestOptions extends RequestInit {
   params?: Record<string, string | number | boolean | string[] | number[] | undefined>;
 }
 
+function normalizePathname(pathname: string): string {
+  if (pathname.startsWith('/api/v1/')) return pathname;
+  if (pathname.startsWith('/api/workspaces/'))
+    return pathname.replace('/api/workspaces/', '/api/v1/workspaces/');
+  if (pathname.startsWith('/workspaces/')) return `/api/v1${pathname}`;
+  if (pathname.startsWith('workspaces/')) return `/api/v1/${pathname}`;
+  return pathname;
+}
+
 function buildUrl(pathname: string, params?: ApiRequestOptions['params']): string {
-  const url = new URL(pathname, env.apiUrl);
+  const normalizedPath = normalizePathname(pathname);
+  const url = new URL(normalizedPath, env.apiUrl);
 
   if (params) {
     for (const [key, value] of Object.entries(params)) {

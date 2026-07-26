@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ActivityEntityType, ActivityAction } from '@orbit/shared';
+import { ActivityEntityType, ActivityAction, envelope } from '@orbit/shared';
 import { Prisma } from '@prisma/client';
 import { RealtimeService } from '../realtime/realtime.service';
 import { ProjectPermissionsService } from '../project-permissions/project-permissions.service';
@@ -34,7 +34,10 @@ export class ActivityService {
     try {
       let actorName = params.actorName;
       if (!actorName) {
-        const user = await this.prisma.user.findUnique({ where: { id: params.userId }, select: { displayName: true } });
+        const user = await this.prisma.user.findUnique({
+          where: { id: params.userId },
+          select: { displayName: true },
+        });
         actorName = user?.displayName || 'Unknown User';
       }
 
@@ -61,24 +64,32 @@ export class ActivityService {
 
       return activity;
     } catch (error) {
-      this.logger.error(`Failed to record activity: ${(error as Error).message}`, (error as Error).stack);
+      this.logger.error(
+        `Failed to record activity: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
       // We generally don't want to crash the main transaction for a failed activity log
     }
   }
 
-  async getWorkspaceActivity(workspaceId: string, userId: string, limit: number = 50, cursor?: string) {
+  async getWorkspaceActivity(
+    workspaceId: string,
+    userId: string,
+    limit: number = 50,
+    cursor?: string,
+  ) {
     const workspaceMember = await this.prisma.workspaceMember.findFirst({
       where: { workspaceId, userId, status: 'ACTIVE' },
     });
     if (!workspaceMember) throw new NotFoundException();
 
     const activities = await this.prisma.activity.findMany({
-      where: { 
+      where: {
         workspaceId,
         OR: [
           { projectId: null },
-          { project: { members: { some: { workspaceMemberId: workspaceMember.id } } } }
-        ]
+          { project: { members: { some: { workspaceMemberId: workspaceMember.id } } } },
+        ],
       },
       orderBy: { createdAt: 'desc' },
       take: limit + 1, // Fetch one extra to determine if there's a next page
@@ -91,13 +102,18 @@ export class ActivityService {
       nextCursor = nextItem?.id;
     }
 
-    return {
-      items: activities,
+    return envelope(activities, {
       nextCursor,
-    };
+    });
   }
 
-  async getProjectActivity(workspaceId: string, userId: string, projectId: string, limit: number = 50, cursor?: string) {
+  async getProjectActivity(
+    workspaceId: string,
+    userId: string,
+    projectId: string,
+    limit: number = 50,
+    cursor?: string,
+  ) {
     await this.permissionsService.requireProjectRole(workspaceId, projectId, userId, 'VIEWER');
 
     const activities = await this.prisma.activity.findMany({
@@ -113,9 +129,8 @@ export class ActivityService {
       nextCursor = nextItem?.id;
     }
 
-    return {
-      items: activities,
+    return envelope(activities, {
       nextCursor,
-    };
+    });
   }
 }

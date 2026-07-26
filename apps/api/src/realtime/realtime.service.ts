@@ -24,9 +24,9 @@ export class RealtimeService {
 
     try {
       const room = projectId ? `project:${projectId}` : `workspace:${workspaceId}`;
-      
+
       this.logger.debug(`Broadcasting ${event} to ${room}`);
-      
+
       this.gateway.server.to(room).emit(event, {
         workspaceId,
         projectId,
@@ -37,6 +37,22 @@ export class RealtimeService {
     } catch (error) {
       // Realtime errors must NEVER break the application
       this.logger.error(`Failed to broadcast event ${event}`, error);
+    }
+  }
+
+  async evictWorkspaceUser(workspaceId: string, userId: string): Promise<void> {
+    try {
+      await this.gateway.evictUserFromWorkspace(userId, workspaceId);
+    } catch (error) {
+      this.logger.error(`Failed to evict user ${userId} from workspace ${workspaceId}`, error);
+    }
+  }
+
+  evictProjectUser(projectId: string, userId: string): void {
+    try {
+      this.gateway.evictUserFromProject(userId, projectId);
+    } catch (error) {
+      this.logger.error(`Failed to evict user ${userId} from project ${projectId}`, error);
     }
   }
 }

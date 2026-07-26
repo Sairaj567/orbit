@@ -1,10 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  CreateProjectInput,
-  UpdateProjectInput,
-  ProjectQueryInput,
-} from '@orbit/shared';
+import { CreateProjectInput, UpdateProjectInput, ProjectQueryInput, envelope } from '@orbit/shared';
 import { Prisma } from '@prisma/client';
 
 import { ActivityService } from '../activity/activity.service';
@@ -20,11 +16,7 @@ export class ProjectsService {
     private readonly permissionsService: ProjectPermissionsService,
   ) {}
 
-  async create(
-    data: CreateProjectInput,
-    userId: string,
-    workspaceId: string,
-  ) {
+  async create(data: CreateProjectInput, userId: string, workspaceId: string) {
     const workspaceMember = await this.prisma.workspaceMember.findFirst({
       where: { workspaceId, userId, status: 'ACTIVE' },
     });
@@ -83,15 +75,15 @@ export class ProjectsService {
     });
     if (!workspaceMember) throw new ForbiddenException();
 
-    const where: Prisma.ProjectWhereInput = { 
+    const where: Prisma.ProjectWhereInput = {
       workspaceId,
       members: {
         some: {
-          workspaceMemberId: workspaceMember.id
-        }
-      }
+          workspaceMemberId: workspaceMember.id,
+        },
+      },
     };
-    
+
     if (status) where.status = status;
     if (visibility) where.visibility = visibility;
     if (isArchived !== undefined) where.isArchived = isArchived;
@@ -112,15 +104,12 @@ export class ProjectsService {
       this.prisma.project.count({ where }),
     ]);
 
-    return {
-      items,
-      meta: {
-        total,
-        page,
-        perPage,
-        totalPages: Math.ceil(total / perPage),
-      },
-    };
+    return envelope(items, {
+      total,
+      page,
+      perPage,
+      totalPages: Math.ceil(total / perPage),
+    });
   }
 
   async findOne(id: string, workspaceId: string, userId: string) {
@@ -133,10 +122,10 @@ export class ProjectsService {
           include: {
             workspaceMember: {
               include: {
-                user: true
-              }
-            }
-          }
+                user: true,
+              },
+            },
+          },
         },
       },
     });

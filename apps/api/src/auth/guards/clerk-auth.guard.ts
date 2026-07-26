@@ -1,13 +1,8 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  InternalServerErrorException,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { verifyToken } from '@clerk/backend';
 import { PrismaService } from '../../prisma/prisma.service';
+import { UserProvisioningService } from '../services/user-provisioning.service';
 import type { AuthenticatedRequest } from '../types';
 
 @Injectable()
@@ -15,6 +10,7 @@ export class ClerkAuthGuard implements CanActivate {
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly userProvisioningService: UserProvisioningService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -22,23 +18,24 @@ export class ClerkAuthGuard implements CanActivate {
     const token = this.extractBearerToken(request.headers.authorization);
 
     if (!token) {
-      throw new UnauthorizedException('Bearer token is required');
+      throw new UnauthorizedException('Missing Authorization Bearer token');
     }
 
-    const secretKey = this.configService.get<string>('clerk.secretKey');
+    const secretKey =
+      this.configService.get<string>('CLERK_SECRET_KEY') || process.env.CLERK_SECRET_KEY;
 
     if (!secretKey) {
-      throw new InternalServerErrorException('Clerk secret key is not configured');
+      throw new UnauthorizedException('Clerk secret key is not configured');
     }
 
     const payload = await this.verifyClerkToken(token, secretKey);
-    const clerkId = payload.sub;
+    const clerkId = typeof payload.sub === 'string' ? payload.sub : undefined;
 
     if (!clerkId) {
       throw new UnauthorizedException('Clerk token is missing a subject');
     }
 
-    const user = await this.prisma.user.findUnique({
+    const dbUser = await this.prisma.user.findUnique({
       where: { clerkId },
       select: {
         id: true,
@@ -47,12 +44,24 @@ export class ClerkAuthGuard implements CanActivate {
         displayName: true,
         avatarUrl: true,
         timezone: true,
+        deletedAt: true,
       },
     });
 
-    if (!user) {
-      throw new UnauthorizedException('Authenticated user has not been synced');
+    if (dbUser?.deletedAt) {
+      throw new UnauthorizedException('User account has been deleted');
     }
+
+    const user = dbUser
+      ? {
+          id: dbUser.id,
+          clerkId: dbUser.clerkId,
+          email: dbUser.email,
+          displayName: dbUser.displayName,
+          avatarUrl: dbUser.avatarUrl,
+          timezone: dbUser.timezone,
+        }
+      : await this.userProvisioningService.provisionUserJit(clerkId, secretKey);
 
     request.auth = {
       clerkId,
@@ -67,21 +76,23 @@ export class ClerkAuthGuard implements CanActivate {
   private extractBearerToken(header: string | undefined): string | undefined {
     if (!header) return undefined;
 
-    const [scheme, token] = header.split(' ');
-
-    if (scheme?.toLowerCase() !== 'bearer' || !token) {
+    const [scheme, token] = header.trim().split(/\s+/);
+    if (!scheme || scheme.toLowerCase() !== 'bearer' || !token) {
       return undefined;
     }
 
     return token;
   }
 
-  private async verifyClerkToken(token: string, secretKey: string) {
+  private async verifyClerkToken(
+    token: string,
+    secretKey: string,
+  ): Promise<Record<string, unknown>> {
     try {
-      return await verifyToken(token, { secretKey });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Invalid Clerk token';
-      throw new UnauthorizedException(message);
+      const payload = await verifyToken(token, { secretKey });
+      return payload as Record<string, unknown>;
+    } catch {
+      throw new UnauthorizedException('Invalid or expired Clerk token');
     }
   }
 }

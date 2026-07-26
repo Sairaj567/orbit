@@ -12,6 +12,8 @@
     "build": "turbo build",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "test:e2e": "turbo test:e2e",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,mjs,json,md,css,yaml,yml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mjs,json,md,css,yaml,yml}\"",
     "clean": "turbo clean && rimraf node_modules",

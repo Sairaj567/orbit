@@ -36,9 +36,11 @@ export interface WorkspaceOption {
   name: string;
   slug: string;
   role: WorkspaceRole;
-  members: number;
-  status: string;
-  accent: string;
+  description?: string | null;
+  avatarUrl?: string | null;
+  members?: number;
+  status?: string;
+  accent?: string;
 }
 
 export interface BreadcrumbItem {
@@ -62,6 +64,24 @@ export interface ActivityItem {
   detail: string;
   time: string;
   tone: 'positive' | 'neutral' | 'warning';
+}
+
+const ACCENT_PALETTES = [
+  'from-violet-500/30 via-violet-500/10 to-transparent',
+  'from-cyan-500/30 via-cyan-500/10 to-transparent',
+  'from-emerald-500/30 via-emerald-500/10 to-transparent',
+  'from-amber-500/30 via-amber-500/10 to-transparent',
+  'from-rose-500/30 via-rose-500/10 to-transparent',
+];
+
+export function getWorkspaceAccent(identifier: string = ''): string {
+  let hash = 0;
+  for (let i = 0; i < identifier.length; i++) {
+    hash = (hash << 5) - hash + identifier.charCodeAt(i);
+    hash |= 0;
+  }
+  const index = Math.abs(hash) % ACCENT_PALETTES.length;
+  return ACCENT_PALETTES[index]!;
 }
 
 export const WORKSPACES: WorkspaceOption[] = [

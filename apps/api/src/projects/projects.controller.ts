@@ -20,9 +20,12 @@ import {
   updateProjectSchema,
   projectQuerySchema,
 } from '@orbit/shared';
+import { WorkspaceRole } from '@prisma/client';
 import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
 import { WorkspaceMembershipGuard } from '../auth/guards/workspace-membership.guard';
+import { WorkspaceRoles } from '../auth/decorators/workspace-roles.decorator';
 import { AuthenticatedRequest } from '../auth/types';
+import { WorkspaceId } from '../common/decorators/workspace-id.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 
 @Controller('workspaces/:workspaceId/projects')
@@ -31,9 +34,10 @@ export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
 
   @Post()
+  @WorkspaceRoles(WorkspaceRole.OWNER, WorkspaceRole.ADMIN, WorkspaceRole.MEMBER)
   @UsePipes(new ZodValidationPipe(createProjectSchema))
   create(
-    @Param('workspaceId') workspaceId: string,
+    @WorkspaceId() workspaceId: string,
     @Req() req: AuthenticatedRequest,
     @Body() createProjectDto: CreateProjectInput,
   ) {
@@ -43,7 +47,7 @@ export class ProjectsController {
   @Get()
   @UsePipes(new ZodValidationPipe(projectQuerySchema))
   findAll(
-    @Param('workspaceId') workspaceId: string,
+    @WorkspaceId() workspaceId: string,
     @Req() req: AuthenticatedRequest,
     @Query() query: ProjectQueryInput,
   ) {
@@ -52,7 +56,7 @@ export class ProjectsController {
 
   @Get(':id')
   findOne(
-    @Param('workspaceId') workspaceId: string,
+    @WorkspaceId() workspaceId: string,
     @Param('id') id: string,
     @Req() req: AuthenticatedRequest,
   ) {
@@ -62,7 +66,7 @@ export class ProjectsController {
   @Patch(':id')
   @UsePipes(new ZodValidationPipe(updateProjectSchema))
   update(
-    @Param('workspaceId') workspaceId: string,
+    @WorkspaceId() workspaceId: string,
     @Param('id') id: string,
     @Req() req: AuthenticatedRequest,
     @Body() updateProjectDto: UpdateProjectInput,
@@ -72,7 +76,7 @@ export class ProjectsController {
 
   @Delete(':id')
   remove(
-    @Param('workspaceId') workspaceId: string,
+    @WorkspaceId() workspaceId: string,
     @Param('id') id: string,
     @Req() req: AuthenticatedRequest,
   ) {

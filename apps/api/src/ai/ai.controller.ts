@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
 import { AiService } from './ai.service';
 import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
 import { WorkspaceMembershipGuard } from '../auth/guards/workspace-membership.guard';
+import { WorkspaceId } from '../common/decorators/workspace-id.decorator';
 
 @Controller('workspaces/:workspaceId/ai')
 @UseGuards(ClerkAuthGuard, WorkspaceMembershipGuard)
@@ -16,9 +17,9 @@ export class AiController {
 
   @Get('search')
   async search(
-    @Param('workspaceId') workspaceId: string,
+    @WorkspaceId() workspaceId: string,
     @Query('q') query: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
   ) {
     const parsedLimit = limit ? parseInt(limit, 10) : 5;
     const results = await this.aiService.semanticSearch(workspaceId, query, parsedLimit);

@@ -10,6 +10,7 @@ import {
   Visibility,
   WorkspaceRole,
 } from '@prisma/client';
+import { createWorkspaceSchema } from '@orbit/shared';
 
 const prisma = new PrismaClient();
 
@@ -116,29 +117,77 @@ async function main() {
     },
   });
 
-  const workspace = await prisma.workspace.upsert({
-    where: { slug: 'orbit-demo' },
-    update: {
-      name: 'Orbit Demo',
-      description: 'Shared productivity workspace for study, habits, chores, and planning.',
-      settings: {
-        notifications: { browser: true, discord: false },
-        gamification: { xpEnabled: true },
-      },
-      deletedAt: null,
-    },
-    create: {
-      id: ids.workspace,
-      name: 'Orbit Demo',
-      slug: 'orbit-demo',
-      description: 'Shared productivity workspace for study, habits, chores, and planning.',
-      inviteCode: 'orbit-demo-invite',
-      settings: {
-        notifications: { browser: true, discord: false },
-        gamification: { xpEnabled: true },
-      },
-    },
+  const seedSlug = process.env.SEED_WORKSPACE_SLUG || 'orbit-seed-demo';
+  let targetSlug = seedSlug;
+
+  const existingWorkspace = await prisma.workspace.findUnique({
+    where: { slug: targetSlug },
   });
+
+  if (existingWorkspace && existingWorkspace.id !== ids.workspace) {
+    console.warn(
+      `[Seed] Target slug "${targetSlug}" is owned by a non-seed workspace. Using fallback slug...`,
+    );
+    targetSlug = `${seedSlug}-system`;
+  }
+
+  const workspaceInput = createWorkspaceSchema.parse({
+    name: 'Orbit Demo',
+    slug: targetSlug,
+    description: 'Shared productivity workspace for study, habits, chores, and planning.',
+  });
+
+  let workspace;
+  try {
+    workspace = await prisma.workspace.upsert({
+      where: { id: ids.workspace },
+      update: {
+        name: workspaceInput.name,
+        slug: workspaceInput.slug,
+        description: workspaceInput.description,
+        settings: {
+          notifications: { browser: true, discord: false },
+          gamification: { xpEnabled: true },
+        },
+        deletedAt: null,
+      },
+      create: {
+        id: ids.workspace,
+        name: workspaceInput.name,
+        slug: workspaceInput.slug,
+        description: workspaceInput.description,
+        inviteCode: `${workspaceInput.slug}-invite`,
+        settings: {
+          notifications: { browser: true, discord: false },
+          gamification: { xpEnabled: true },
+        },
+      },
+    });
+  } catch (error: any) {
+    if (error?.code === 'P2002') {
+      const fallbackSlug = `${workspaceInput.slug}-${Date.now()}`;
+      console.warn(
+        `[Seed] Slug collision detected on upsert (P2002). Retrying with fallback slug "${fallbackSlug}".`,
+      );
+      workspace = await prisma.workspace.upsert({
+        where: { id: ids.workspace },
+        update: {
+          name: workspaceInput.name,
+          slug: fallbackSlug,
+          description: workspaceInput.description,
+        },
+        create: {
+          id: ids.workspace,
+          name: workspaceInput.name,
+          slug: fallbackSlug,
+          description: workspaceInput.description,
+          inviteCode: `${fallbackSlug}-invite`,
+        },
+      });
+    } else {
+      throw error;
+    }
+  }
 
   const sairaMember = await prisma.workspaceMember.upsert({
     where: { id: ids.sairaMember },

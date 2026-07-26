@@ -1,18 +1,33 @@
 import { apiClient } from '@/lib/api-client';
-import type { SemanticSearchResult, SummarizeResponse } from '@orbit/shared';
+import type { SemanticSearchResult, SummarizeResponse, ApiResponse } from '@orbit/shared';
 
 export const aiClient = {
-  async summarize(workspaceId: string, text: string): Promise<SummarizeResponse> {
-    return apiClient<SummarizeResponse>(`/api/workspaces/${workspaceId}/ai/summarize`, {
-      method: 'POST',
-      body: JSON.stringify({ text }),
-    });
+  async summarize(workspaceId: string, text: string, token?: string): Promise<SummarizeResponse> {
+    const response = await apiClient<ApiResponse<SummarizeResponse>>(
+      `/api/v1/workspaces/${workspaceId}/ai/summarize`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ text }),
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      },
+    );
+    return response.data;
   },
 
-  async semanticSearch(workspaceId: string, query: string, limit: number = 5): Promise<SemanticSearchResult[]> {
-    return apiClient<SemanticSearchResult[]>(`/api/workspaces/${workspaceId}/ai/search`, {
-      method: 'GET',
-      params: { q: query, limit },
-    });
+  async semanticSearch(
+    workspaceId: string,
+    query: string,
+    limit: number = 5,
+    token?: string,
+  ): Promise<SemanticSearchResult[]> {
+    const response = await apiClient<ApiResponse<SemanticSearchResult[]>>(
+      `/api/v1/workspaces/${workspaceId}/ai/search`,
+      {
+        method: 'GET',
+        params: { q: query, limit },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      },
+    );
+    return response.data;
   },
 };

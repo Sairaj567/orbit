@@ -19,7 +19,14 @@ export class NotesService {
 
   async create(workspaceId: string, userId: string, data: CreateNoteInput) {
     if (data.projectId) {
-      await this.permissionsService.requireProjectRole(workspaceId, data.projectId, userId, 'EDITOR');
+      await this.permissionsService.requireProjectRole(
+        workspaceId,
+        data.projectId,
+        userId,
+        'EDITOR',
+      );
+    } else {
+      await this.permissionsService.requireWorkspaceRole(workspaceId, userId, 'MEMBER');
     }
     const note = await this.prisma.note.create({
       data: {
@@ -63,20 +70,25 @@ export class NotesService {
     if (!workspaceMember) throw new NotFoundException();
 
     if (query.projectId) {
-      await this.permissionsService.requireProjectRole(workspaceId, query.projectId, userId, 'VIEWER');
+      await this.permissionsService.requireProjectRole(
+        workspaceId,
+        query.projectId,
+        userId,
+        'VIEWER',
+      );
     }
 
-    const where: Prisma.NoteWhereInput = { 
+    const where: Prisma.NoteWhereInput = {
       workspaceId,
       ...(!query.projectId && {
-        project: { members: { some: { workspaceMemberId: workspaceMember.id } } }
-      })
+        project: { members: { some: { workspaceMemberId: workspaceMember.id } } },
+      }),
     };
-    
+
     if (query.projectId) {
       where.projectId = query.projectId;
     }
-    
+
     if (query.taskId) {
       where.taskId = query.taskId;
     }
@@ -87,11 +99,7 @@ export class NotesService {
 
     return this.prisma.note.findMany({
       where,
-      orderBy: [
-        { isPinned: 'desc' },
-        { order: 'asc' },
-        { updatedAt: 'desc' }
-      ],
+      orderBy: [{ isPinned: 'desc' }, { order: 'asc' }, { updatedAt: 'desc' }],
     });
   }
 
@@ -99,13 +107,18 @@ export class NotesService {
     const note = await this.prisma.note.findUnique({
       where: { id, workspaceId },
     });
-    
+
     if (!note) {
       throw new NotFoundException(`Note with ID ${id} not found`);
     }
 
     if (note.projectId) {
-      await this.permissionsService.requireProjectRole(workspaceId, note.projectId, userId, 'VIEWER');
+      await this.permissionsService.requireProjectRole(
+        workspaceId,
+        note.projectId,
+        userId,
+        'VIEWER',
+      );
     }
 
     return note;
@@ -113,15 +126,31 @@ export class NotesService {
 
   async update(workspaceId: string, userId: string, id: string, data: UpdateNoteInput) {
     const note = await this.findOne(workspaceId, userId, id);
-    
+
     if (note.projectId) {
-      await this.permissionsService.requireProjectRole(workspaceId, note.projectId, userId, 'EDITOR');
+      await this.permissionsService.requireProjectRole(
+        workspaceId,
+        note.projectId,
+        userId,
+        'EDITOR',
+      );
+    } else {
+      await this.permissionsService.requireWorkspaceRole(workspaceId, userId, 'MEMBER');
     }
 
-    if (data.projectId && data.projectId !== note.projectId) {
-      await this.permissionsService.requireProjectRole(workspaceId, data.projectId, userId, 'EDITOR');
+    if (data.projectId !== undefined && data.projectId !== note.projectId) {
+      if (data.projectId) {
+        await this.permissionsService.requireProjectRole(
+          workspaceId,
+          data.projectId,
+          userId,
+          'EDITOR',
+        );
+      } else {
+        await this.permissionsService.requireWorkspaceRole(workspaceId, userId, 'MEMBER');
+      }
     }
-    
+
     const updatedNote = await this.prisma.note.update({
       where: { id, workspaceId },
       data: {
@@ -153,7 +182,11 @@ export class NotesService {
     });
 
     // Fire & forget embedding generation
-    this.aiService.embedEntity(updatedNote.id, 'Note', `${updatedNote.title}\n${updatedNote.content}`);
+    this.aiService.embedEntity(
+      updatedNote.id,
+      'Note',
+      `${updatedNote.title}\n${updatedNote.content}`,
+    );
 
     return updatedNote;
   }
@@ -162,9 +195,16 @@ export class NotesService {
     const note = await this.findOne(workspaceId, userId, id);
 
     if (note.projectId) {
-      await this.permissionsService.requireProjectRole(workspaceId, note.projectId, userId, 'EDITOR');
+      await this.permissionsService.requireProjectRole(
+        workspaceId,
+        note.projectId,
+        userId,
+        'EDITOR',
+      );
+    } else {
+      await this.permissionsService.requireWorkspaceRole(workspaceId, userId, 'MEMBER');
     }
-    
+
     const deletedNote = await this.prisma.note.delete({
       where: { id, workspaceId },
     });

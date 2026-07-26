@@ -35,7 +35,9 @@ export class DashboardService {
       },
     });
 
-    const tasks = activeTasks.filter((t) => t.dueDate && t.dueDate >= today && t.dueDate <= endOfToday);
+    const tasks = activeTasks.filter(
+      (t) => t.dueDate && t.dueDate >= today && t.dueDate <= endOfToday,
+    );
     const overdueTasks = activeTasks.filter((t) => t.dueDate && t.dueDate < today);
 
     // Fetch Habits
@@ -54,7 +56,7 @@ export class DashboardService {
         task: true,
         habit: true,
         project: true,
-      }
+      },
     });
 
     // Focus Time Today
@@ -66,7 +68,10 @@ export class DashboardService {
         endedAt: { gte: today, lte: endOfToday },
       },
     });
-    const focusTimeToday = todayStudyBlocks.reduce((acc, block) => acc + (block.actualDuration || 0), 0);
+    const focusTimeToday = todayStudyBlocks.reduce(
+      (acc, block) => acc + (block.actualDuration || 0),
+      0,
+    );
 
     // Focus Time Weekly
     const weeklyStudyBlocks = await this.prisma.studyBlock.findMany({
@@ -77,7 +82,10 @@ export class DashboardService {
         endedAt: { gte: startOfWeek, lte: endOfToday },
       },
     });
-    const weeklyFocusMinutes = weeklyStudyBlocks.reduce((acc, block) => acc + (block.actualDuration || 0), 0);
+    const weeklyFocusMinutes = weeklyStudyBlocks.reduce(
+      (acc, block) => acc + (block.actualDuration || 0),
+      0,
+    );
     const weeklyFocusHours = Number((weeklyFocusMinutes / 60).toFixed(1));
 
     // Tasks completed today
@@ -91,9 +99,12 @@ export class DashboardService {
     });
 
     // Habit stats
-    const habitsCompletedToday = habits.filter(h => h.lastCompletedAt && h.lastCompletedAt >= today && h.lastCompletedAt <= endOfToday).length;
-    const habitCompletionPercent = habits.length > 0 ? Math.round((habitsCompletedToday / habits.length) * 100) : 0;
-    const currentStreak = habits.length > 0 ? Math.max(...habits.map(h => h.streak)) : 0;
+    const habitsCompletedToday = habits.filter(
+      (h) => h.lastCompletedAt && h.lastCompletedAt >= today && h.lastCompletedAt <= endOfToday,
+    ).length;
+    const habitCompletionPercent =
+      habits.length > 0 ? Math.round((habitsCompletedToday / habits.length) * 100) : 0;
+    const currentStreak = habits.length > 0 ? Math.max(...habits.map((h) => h.streak)) : 0;
 
     // Productivity Score Formula: 40% Tasks, 30% Habits, 20% Focus, 10% Consistency
     // Baseline: Tasks (5 = 100%), Habits (3 = 100%), Focus (120 mins = 100%), Streak (5 = 100%)
@@ -101,7 +112,9 @@ export class DashboardService {
     const habitsScore = Math.min(habitsCompletedToday / 3, 1) * 30;
     const focusScore = Math.min(focusTimeToday / 120, 1) * 20;
     const consistencyScore = Math.min(currentStreak / 5, 1) * 10;
-    const weeklyProductivityScore = Math.round(tasksScore + habitsScore + focusScore + consistencyScore);
+    const weeklyProductivityScore = Math.round(
+      tasksScore + habitsScore + focusScore + consistencyScore,
+    );
 
     // Recent Projects
     const recentProjects = await this.prisma.project.findMany({
@@ -110,22 +123,22 @@ export class DashboardService {
       take: 4,
       include: {
         members: true,
-      }
+      },
     });
 
     // We need task completion rate for projects
     // Just mock it or calculate it if possible. We can do a quick count.
-    const projectIds = recentProjects.map(p => p.id);
+    const projectIds = recentProjects.map((p) => p.id);
     const projectTaskStats = await this.prisma.task.groupBy({
       by: ['projectId', 'status'],
       where: { projectId: { in: projectIds } },
       _count: true,
     });
 
-    const mappedProjects = recentProjects.map(project => {
-      const stats = projectTaskStats.filter(s => s.projectId === project.id);
+    const mappedProjects = recentProjects.map((project) => {
+      const stats = projectTaskStats.filter((s) => s.projectId === project.id);
       const totalTasks = stats.reduce((acc, curr) => acc + curr._count, 0);
-      const doneTasks = stats.find(s => s.status === 'DONE')?._count || 0;
+      const doneTasks = stats.find((s) => s.status === 'DONE')?._count || 0;
       const taskCompletionRate = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
       return {
@@ -153,8 +166,8 @@ export class DashboardService {
         weeklyProductivityScore,
         weeklyFocusHours,
       },
-      projects: mappedProjects, 
-      activity: activityResult.items,
+      projects: mappedProjects,
+      activity: activityResult.data,
     } as unknown as DashboardResponse;
   }
 }

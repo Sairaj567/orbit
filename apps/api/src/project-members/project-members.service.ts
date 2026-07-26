@@ -21,23 +21,29 @@ export class ProjectMembersService {
         workspaceMember: {
           include: {
             user: true,
-          }
-        }
+          },
+        },
       },
-      orderBy: { joinedAt: 'asc' }
+      orderBy: { joinedAt: 'asc' },
     });
   }
 
-  async invite(workspaceId: string, projectId: string, userId: string, targetWorkspaceMemberId: string, role: 'VIEWER' | 'EDITOR' | 'OWNER') {
+  async invite(
+    workspaceId: string,
+    projectId: string,
+    userId: string,
+    targetWorkspaceMemberId: string,
+    role: 'VIEWER' | 'EDITOR' | 'OWNER',
+  ) {
     await this.permissionsService.requireProjectRole(workspaceId, projectId, userId, 'OWNER');
 
     const existing = await this.prisma.projectMember.findUnique({
       where: {
         projectId_workspaceMemberId: {
           projectId,
-          workspaceMemberId: targetWorkspaceMemberId
-        }
-      }
+          workspaceMemberId: targetWorkspaceMemberId,
+        },
+      },
     });
 
     if (existing) {
@@ -52,9 +58,9 @@ export class ProjectMembersService {
       },
       include: {
         workspaceMember: {
-          include: { user: true }
-        }
-      }
+          include: { user: true },
+        },
+      },
     });
 
     this.realtimeService.broadcast({
@@ -68,7 +74,13 @@ export class ProjectMembersService {
     return member;
   }
 
-  async updateRole(workspaceId: string, projectId: string, userId: string, memberId: string, role: 'VIEWER' | 'EDITOR' | 'OWNER') {
+  async updateRole(
+    workspaceId: string,
+    projectId: string,
+    userId: string,
+    memberId: string,
+    role: 'VIEWER' | 'EDITOR' | 'OWNER',
+  ) {
     await this.permissionsService.requireProjectRole(workspaceId, projectId, userId, 'OWNER');
 
     const member = await this.prisma.projectMember.findFirst({
@@ -80,7 +92,7 @@ export class ProjectMembersService {
     // Prevent changing your own role if you're the only owner
     if (role !== 'OWNER' && member.role === 'OWNER') {
       const owners = await this.prisma.projectMember.count({
-        where: { projectId, role: 'OWNER' }
+        where: { projectId, role: 'OWNER' },
       });
       if (owners <= 1) {
         throw new ConflictException('Cannot change the role of the last owner');
@@ -92,9 +104,9 @@ export class ProjectMembersService {
       data: { role: role as ProjectRole },
       include: {
         workspaceMember: {
-          include: { user: true }
-        }
-      }
+          include: { user: true },
+        },
+      },
     });
 
     this.realtimeService.broadcast({
@@ -109,10 +121,16 @@ export class ProjectMembersService {
   }
 
   async remove(workspaceId: string, projectId: string, userId: string, memberId: string) {
-    const actor = await this.permissionsService.requireProjectRole(workspaceId, projectId, userId, 'VIEWER');
-    
+    const actor = await this.permissionsService.requireProjectRole(
+      workspaceId,
+      projectId,
+      userId,
+      'VIEWER',
+    );
+
     const member = await this.prisma.projectMember.findFirst({
       where: { id: memberId, projectId },
+      include: { workspaceMember: { select: { userId: true } } },
     });
 
     if (!member) throw new NotFoundException();
@@ -124,7 +142,7 @@ export class ProjectMembersService {
 
     if (member.role === 'OWNER') {
       const owners = await this.prisma.projectMember.count({
-        where: { projectId, role: 'OWNER' }
+        where: { projectId, role: 'OWNER' },
       });
       if (owners <= 1) {
         throw new ConflictException('Cannot remove the last owner');
@@ -134,6 +152,10 @@ export class ProjectMembersService {
     await this.prisma.projectMember.delete({
       where: { id: memberId },
     });
+
+    if (member.workspaceMember?.userId) {
+      this.realtimeService.evictProjectUser(projectId, member.workspaceMember.userId);
+    }
 
     this.realtimeService.broadcast({
       workspaceId,

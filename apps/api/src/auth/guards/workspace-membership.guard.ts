@@ -19,6 +19,8 @@ const WORKSPACE_ROLE_RANK: Record<WorkspaceRole, number> = {
   OWNER: 3,
 };
 
+const WORKSPACE_ACCESS_DENIED_MESSAGE = 'Workspace not found or access denied';
+
 @Injectable()
 export class WorkspaceMembershipGuard implements CanActivate {
   constructor(
@@ -33,16 +35,33 @@ export class WorkspaceMembershipGuard implements CanActivate {
       throw new UnauthorizedException('Authenticated user is required');
     }
 
-    const workspaceId = getWorkspaceIdFromRequest(request);
+    const rawIdentifier = getWorkspaceIdFromRequest(request);
 
-    if (!workspaceId) {
-      throw new ForbiddenException('Workspace ID is required');
+    if (!rawIdentifier) {
+      throw new ForbiddenException('Workspace ID or slug is required');
+    }
+
+    const workspace = await this.prisma.workspace.findFirst({
+      where: {
+        OR: [{ id: rawIdentifier }, { slug: rawIdentifier }],
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+      },
+    });
+
+    if (!workspace) {
+      throw new ForbiddenException(WORKSPACE_ACCESS_DENIED_MESSAGE);
     }
 
     const membership = await this.prisma.workspaceMember.findFirst({
       where: {
         userId: request.user.id,
-        workspaceId,
+        workspaceId: workspace.id,
+        status: 'ACTIVE',
         workspace: {
           deletedAt: null,
         },
@@ -57,8 +76,11 @@ export class WorkspaceMembershipGuard implements CanActivate {
     });
 
     if (!membership) {
-      throw new ForbiddenException('Workspace membership is required');
+      throw new ForbiddenException(WORKSPACE_ACCESS_DENIED_MESSAGE);
     }
+
+    request.workspace = workspace;
+    request.workspaceId = workspace.id;
 
     const requiredRoles =
       this.reflector.getAllAndOverride<WorkspaceRole[]>(WORKSPACE_ROLES_KEY, [
@@ -75,10 +97,7 @@ export class WorkspaceMembershipGuard implements CanActivate {
     return true;
   }
 
-  private hasRequiredRole(
-    currentRole: WorkspaceRole,
-    requiredRoles: WorkspaceRole[],
-  ): boolean {
+  private hasRequiredRole(currentRole: WorkspaceRole, requiredRoles: WorkspaceRole[]): boolean {
     if (requiredRoles.length === 0) {
       return true;
     }

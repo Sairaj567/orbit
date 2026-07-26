@@ -8,3 +8,4 @@ export * from './types/note.js';
 export * from './types/activity.js';
 export * from './types/realtime.js';
 export * from './types/dashboard.js';
+export * from './utils/envelope.js';

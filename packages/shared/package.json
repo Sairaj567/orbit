@@ -8,18 +8,22 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
     }
   },
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "clean": "rimraf dist .turbo",
     "typecheck": "tsc --noEmit",
-    "lint": "echo 'No lint configured yet'"
+    "lint": "echo 'No lint configured yet'",
+    "test": "vitest run"
   },
   "devDependencies": {
+    "rimraf": "^6.0.0",
     "typescript": "^5.7.0",
-    "rimraf": "^6.0.0"
+    "vitest": "^3.0.0"
   },
   "dependencies": {
     "zod": "^3.24.0"

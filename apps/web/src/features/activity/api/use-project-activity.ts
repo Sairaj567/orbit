@@ -9,14 +9,18 @@ interface UseProjectActivityOptions {
   limit?: number;
 }
 
-export function useProjectActivity({ workspaceId, projectId, limit = 20 }: UseProjectActivityOptions) {
+export function useProjectActivity({
+  workspaceId,
+  projectId,
+  limit = 20,
+}: UseProjectActivityOptions) {
   const { getToken } = useAuth();
   return useInfiniteQuery({
     queryKey: ['workspaces', workspaceId, 'projects', projectId, 'activity'],
     queryFn: async ({ pageParam }) => {
       const token = await getToken();
-      const data = await apiClient<{ data: Activity[]; nextCursor?: string }>(
-        `/api/v1/workspaces/${workspaceId}/activity/projects/${projectId}`,
+      const res = await apiClient<{ data: Activity[]; meta?: { nextCursor?: string } }>(
+        `/api/v1/workspaces/${workspaceId}/projects/${projectId}/activity`,
         {
           method: 'GET',
           params: {
@@ -24,11 +28,14 @@ export function useProjectActivity({ workspaceId, projectId, limit = 20 }: UsePr
             cursor: pageParam,
           },
           headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
+            Authorization: `Bearer ${token}`,
+          },
+        },
       );
-      return data;
+      return {
+        data: res.data,
+        nextCursor: res.meta?.nextCursor,
+      };
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     initialPageParam: undefined as string | undefined,
