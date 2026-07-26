@@ -18,6 +18,14 @@ RUN pnpm --filter @orbit/shared build
 # Stage 3: Build web app
 FROM shared-build AS build
 COPY apps/web/ ./apps/web/
+
+ARG VITE_API_URL
+ARG VITE_WS_URL
+ARG VITE_CLERK_PUBLISHABLE_KEY
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_WS_URL=$VITE_WS_URL
+ENV VITE_CLERK_PUBLISHABLE_KEY=$VITE_CLERK_PUBLISHABLE_KEY
+
 RUN pnpm --filter @orbit/web build
 
 # Stage 4: Serve with nginx

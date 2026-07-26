@@ -52,6 +52,10 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.web
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_WS_URL: ${VITE_WS_URL}
+        VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY}
     container_name: orbit-web
     restart: unless-stopped
     ports:
