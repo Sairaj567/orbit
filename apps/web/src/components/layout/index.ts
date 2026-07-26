@@ -1,7 +1,6 @@
 export * from './AppShell';
 export * from './Breadcrumbs';
 export * from './MobileNav';
-export * from './NotificationButton';
 export * from './QuickAddButton';
 export * from './SearchTrigger';
 export * from './Sidebar';

@@ -1,10 +1,16 @@
+import { lazy, Suspense } from 'react';
 import { ChartNoAxesCombined, TrendingUp, Zap, Clock, Target } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { useDashboard } from '@/features/dashboard/hooks/use-dashboard';
-import { DashboardCharts } from '@/features/dashboard/components/dashboard-charts';
 import { ProductivityCards } from '@/features/dashboard/components/productivity-cards';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+
+const DashboardCharts = lazy(() =>
+  import('@/features/dashboard/components/dashboard-charts').then((m) => ({
+    default: m.DashboardCharts,
+  })),
+);
 
 export function AnalyticsPage() {
   const { data: dashboardData, isLoading } = useDashboard();
@@ -48,7 +54,9 @@ export function AnalyticsPage() {
               Weekly Productivity Trends
             </h3>
           </div>
-          <DashboardCharts stats={stats} />
+          <Suspense fallback={<Skeleton className="h-72 w-full rounded-xl" />}>
+            <DashboardCharts stats={stats} />
+          </Suspense>
         </div>
       )}
 
@@ -66,7 +74,9 @@ export function AnalyticsPage() {
               <Target className="w-4 h-4 text-blue-500" />
               Task Execution (40%)
             </div>
-            <p className="text-2xl font-extrabold text-foreground">{stats.tasksCompletedToday} / Day</p>
+            <p className="text-2xl font-extrabold text-foreground">
+              {stats.tasksCompletedToday} / Day
+            </p>
             <p className="text-xs text-muted-foreground">High completion rate adds up to 40 pts</p>
           </div>
 
@@ -75,7 +85,9 @@ export function AnalyticsPage() {
               <Clock className="w-4 h-4 text-emerald-500" />
               Focus Depth (40%)
             </div>
-            <p className="text-2xl font-extrabold text-foreground">{stats.weeklyFocusHours} Hours / Wk</p>
+            <p className="text-2xl font-extrabold text-foreground">
+              {stats.weeklyFocusHours} Hours / Wk
+            </p>
             <p className="text-xs text-muted-foreground">Deep work study blocks add up to 40 pts</p>
           </div>
 
@@ -84,11 +96,13 @@ export function AnalyticsPage() {
               <ChartNoAxesCombined className="w-4 h-4 text-indigo-500" />
               Habit Consistency (20%)
             </div>
-            <p className="text-2xl font-extrabold text-foreground">{stats.habitCompletionPercent}% Rate</p>
+            <p className="text-2xl font-extrabold text-foreground">
+              {stats.habitCompletionPercent}% Rate
+            </p>
             <p className="text-xs text-muted-foreground">Daily habit streaks add up to 20 pts</p>
           </div>
         </CardContent>
       </Card>
     </div>
   );
-}
+}

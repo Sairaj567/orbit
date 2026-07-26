@@ -1,12 +1,10 @@
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { NoteEditor } from './NoteEditor';
+import { lazy, Suspense } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useUpdateNote } from '../hooks/use-notes';
 import type { Note } from '@orbit/shared';
+
+const NoteEditor = lazy(() => import('./NoteEditor').then((m) => ({ default: m.NoteEditor })));
 
 interface EditNoteDialogProps {
   workspaceId: string;
@@ -26,7 +24,7 @@ export function EditNoteDialog({ workspaceId, note, open, onOpenChange }: EditNo
         onSuccess: () => {
           onOpenChange(false);
         },
-      }
+      },
     );
   };
 
@@ -38,15 +36,17 @@ export function EditNoteDialog({ workspaceId, note, open, onOpenChange }: EditNo
         <DialogHeader>
           <DialogTitle>Edit Note</DialogTitle>
         </DialogHeader>
-        
+
         <div className="flex-1 mt-4">
-          <NoteEditor
-            initialTitle={note.title}
-            initialContent={note.content}
-            onSave={handleSave}
-            onCancel={() => onOpenChange(false)}
-            isSaving={isPending}
-          />
+          <Suspense fallback={<Skeleton className="h-48 w-full rounded-xl" />}>
+            <NoteEditor
+              initialTitle={note.title}
+              initialContent={note.content}
+              onSave={handleSave}
+              onCancel={() => onOpenChange(false)}
+              isSaving={isPending}
+            />
+          </Suspense>
         </div>
       </DialogContent>
     </Dialog>

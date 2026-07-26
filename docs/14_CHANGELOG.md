@@ -1,6 +1,16 @@
 # 14 Changelog
 
 ## [Unreleased]
+
+- **Achievements & Notifications removal (2026-07-26):** Completely removed the unbacked fake UI for Achievements (`AchievementsPage`) and Notifications (`NotificationButton`, notification overlay modal, and unused `useNotificationStore`). No backend services or persistence existed for either feature. Schema fields `User.xp` and `User.level` are retained as inert defaults.
+- **Documentation correction (2026-07-26):** The draft claims immediately below are superseded by the source-verified [Feature Completeness Report](./FEATURE_COMPLETENESS_REPORT.md). They must not be read as production-completion claims.
+  - Habits, Notes, Study Blocks, Calendar, Dashboard, Activity, Search, and Settings have partial or functional-but-incomplete implementations.
+  - Analytics renders fallback/mock chart data and has no dedicated analytics backend.
+  - Achievements and Notifications are presentation/scaffold work, not data-backed features.
+  - Project routing, route protection, realtime consistency, and project-level data isolation remain production blockers.
+
+### Superseded draft claims
+
 - **Orbit Platform Completion (Milestones 7-9)**:
   - **Habits Page**: Built complete habit tracking dashboard with streak stats cards, active habit list, and creation/edit dialogs.
   - **Notes Page**: Built workspace notes application with pinned notes section, search filter, and note editor/creator dialogs.
@@ -27,7 +37,9 @@
 - Instrumented `Projects`, `Tasks`, `Notes`, `Resources`, and `Members` services to automatically record relevant lifecycle events (Creates, Updates, Deletions) and broadcast Realtime events.
 - Created frontend hooks (`useWorkspaceActivity`, `useProjectActivity`) and reusable components (`ActivityList`, `ActivityItem`) for rendering activity feeds.
 - Added comprehensive TypeScript literal unions for `ActivityEntityType` and `ActivityAction` to avoid complex database schema migrations.
+
 ### Added
+
 - **Milestone 6.0 (Workspace Members & Invitations)**
   - Added backend endpoints for workspace member management (Invite, Update Role, Remove).
   - Added frontend `WorkspaceSettingsPage` to view members.
@@ -36,6 +48,7 @@
   - Added roles (`OWNER`, `ADMIN`, `MEMBER`, `VIEWER`) and enforced backend authorization.
 
 ### Fixed
+
 - Updated Prisma `WorkspaceMember` model to support pending invitations (optional `userId`, added `email` and `status`).
 
 - Completed Milestone 5.5: Global Search & Command Palette.
@@ -52,10 +65,13 @@
 - Completed Milestone 5.2: Project Hub. Built `ProjectDashboardPage` integrating tasks and resources.
 - Completed Milestone 5.1: Resources Foundation.
 - Updated `taskQuerySchema` and `resourceQuerySchema` to filter by `projectId`.
+
 ### Added
+
 - **Resource System (V1)**: Fast link pasting and preview cards inside tasks. Added backend regex detection for YouTube, GitHub, PDFs. Unified `metadata` column for future AI/embeddings.
 
 ## v0.1.3 - Milestone 3.3 Task Experience Polish
+
 - Transformed the Task UI from a grid of cards to a high-density list layout.
 - Added interactive checkboxes to task rows for one-click completion.
 - Implemented inline quick task creation (Quick Add).
@@ -63,6 +79,7 @@
 - Added global keyboard shortcuts for power-user navigation (`c`, `/`, `j`, `k`, `Space`, `Enter`).
 
 ## v0.1.2 - Milestone 3.2 Task Experience
+
 - Implemented `TaskList`, `TaskCard`, and `TaskFilters` frontend UI components.
 - Added full URL query state syncing for Task filtering (search, status, priority).
 - Created `TaskForm` and integrated it with Create and Edit Dialogs.
@@ -71,6 +88,7 @@
 - Integrated UI completely with React Query hooks.
 
 ## v0.1.1 - Milestone 3.1 Task Domain Data Layer
+
 - Added Task, Category, TaskAssignee, TaskResource, and TaskComment to Prisma schema.
 - Built backend NestJS Tasks module (Controller, Service, Zod Validation Pipe).
 - Created frontend API client and React Query hooks for Tasks.
@@ -79,6 +97,7 @@
 - **Corrections**: Added documentation recommending GIN/GiST `pg_trgm` index for optimized text search in PostgreSQL.
 
 ## v0.1.0 - Milestone 1 Foundation
+
 - Initialized Turborepo with pnpm workspaces.
 - Created `@orbit/web` with React 19, Vite, and Tailwind v4.
 - Created `@orbit/api` with NestJS 11, Prisma, Redis.

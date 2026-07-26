@@ -30,7 +30,7 @@ This document tracks current limitations and known bugs in the system that do no
 
 - **Accepted Tradeoff:** WebSocket connection authentication via `verifyToken` occurs once during initial handshake. If a Clerk JWT expires mid-session, the active socket connection remains open until the client disconnects or reloads.
 
-## Architectural Findings & Resolved Defects
+## Architectural Findings & Deferred Production Hardening Items
 
 ### 5. Silent NestJS Dependency Injection Resolution Defect (`AuthModule`)
 
@@ -45,3 +45,22 @@ This document tracks current limitations and known bugs in the system that do no
 - **Why Mocked Unit Tests Missed It:** Unit tests in Batch 3 mocked `prisma.user.delete` with `jest.fn()`. Mocked functions swallow calls without executing SQL queries or enforcing PostgreSQL database constraints.
 - **How It Was Discovered:** Discovered during Epic 5 Stage D Rank 2 E2E testing when real Clerk `user.deleted` webhooks were executed against the live `orbit_test` PostgreSQL database.
 - **Resolution:** Upgraded the `User` model to support soft-deletion (`deletedAt DateTime?` via migration `20260725171500_add_user_deleted_at`). `WebhooksService.handleUserDeleted` now soft-deletes the `User` record (`data: { deletedAt: new Date() }`), preserving orphaned task data and history in sole-member workspaces. Application-level cleanup explicitly removes active `TaskAssignee` and `WorkspaceMember` records for the soft-deleted user, while `ClerkAuthGuard` and `RealtimeGateway` reject authentication and socket connections for soft-deleted accounts (`deletedAt !== null`).
+
+### 7. Inert `User.xp` and `User.level` Schema Fields
+
+- **Note:** `User.xp` and `User.level` exist in `schema.prisma` and `packages/shared` types (defaulting to 0 and 1), but are currently unused pending a future Achievements v1 epic. They are retained in the database schema to avoid unnecessary migration risk.
+
+### 8. Deferred Sentry Error Tracking Integration
+
+- **Status:** Explicitly deferred pending production Sentry account creation and DSN configuration decisions.
+- **Impact:** Exception filters currently output structured JSON logs via Pino to stdout/stderr. Production error aggregation and alert dispatching require wiring `@sentry/node` into `AllExceptionsFilter`.
+
+### 9. Deferred Prometheus / OpenTelemetry Metrics Collection
+
+- **Status:** Deferred for single-VM production scale.
+- **Impact:** System performance and latency are evaluated via HTTP response logging and the `/health` endpoint. High-cardinality connection metrics (DB pool metrics, Redis memory stats) can be added via `@willsoto/nestjs-prometheus` in a future multi-node scaling epic.
+
+### 10. Single-Instance Socket.IO Realtime Gateway Limitation
+
+- **Status:** Confirmed single-instance-only architecture.
+- **Impact:** `RealtimeGateway` manages active WebSockets in an in-memory map without `@socket.io/redis-adapter`. On a single-VM deployment, all clients connect to the single container instance. Expanding to multi-VM horizontal scaling requires configuring `socket.io-redis-adapter` to sync events across peer API instances via Redis pub/sub.

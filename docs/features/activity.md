@@ -1,5 +1,7 @@
 # Activity & Event System
 
+> **Status: Partial.** Activity socket broadcasts are implemented, but the frontend invalidation key does not match the activity query key, so live feed refresh is not reliable. Push notifications and presence are not implemented.
+
 ## Overview
 
 The Activity system in Orbit is a unidirectional event-logging engine designed to track important user actions across workspaces and projects.
@@ -40,23 +42,10 @@ model Activity {
 Instead of using Prisma `enum` types for `entityType` and `action`, we define them as TypeScript literal unions in `@orbit/shared/src/types/activity.ts`. This allows us to add new entity types and actions without running database migrations, which is critical for development velocity.
 
 ```typescript
-export type ActivityEntityType =
-  | 'TASK'
-  | 'PROJECT'
-  | 'NOTE'
-  | 'RESOURCE'
-  | 'MEMBER'
-  | 'WORKSPACE';
+export type ActivityEntityType = 'TASK' | 'PROJECT' | 'NOTE' | 'RESOURCE' | 'MEMBER' | 'WORKSPACE';
 
 export type ActivityAction =
-  | 'CREATED'
-  | 'UPDATED'
-  | 'DELETED'
-  | 'COMPLETED'
-  | 'ASSIGNED'
-  | 'INVITED'
-  | 'JOINED'
-  | 'REMOVED';
+  'CREATED' | 'UPDATED' | 'DELETED' | 'COMPLETED' | 'ASSIGNED' | 'INVITED' | 'JOINED' | 'REMOVED';
 ```
 
 ## Backend Services
@@ -70,6 +59,7 @@ The `ActivityService` is injected globally into feature modules (e.g., `TasksSer
 ## Frontend Hooks and UI
 
 The frontend consumes this system using standard TanStack Query patterns.
+
 - `useWorkspaceActivity(workspaceId)`
 - `useProjectActivity(workspaceId, projectId)`
 - `<ActivityList />` - Renders an infinite-scroll list of activities.

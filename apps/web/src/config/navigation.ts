@@ -9,7 +9,6 @@ import {
   Settings2,
   SquareKanban,
   TimerReset,
-  Trophy,
   Users,
   FolderOpenDot,
 } from 'lucide-react';
@@ -193,15 +192,6 @@ export const NAV_ITEMS: NavItem[] = [
     path: 'activity',
     section: 'secondary',
     order: 4,
-  },
-  {
-    id: 'trophies',
-    label: 'Achievements',
-    icon: Trophy,
-    path: 'achievements',
-    section: 'secondary',
-    order: 5,
-    badge: () => 2,
   },
   {
     id: 'workspace-settings',

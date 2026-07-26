@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { LoggerModule } from 'nestjs-pino';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -30,6 +31,15 @@ import { validateEnv } from './config/env.validation';
       load: [configuration],
       validate: validateEnv,
       expandVariables: true,
+    }),
+    LoggerModule.forRoot({
+      pinoHttp: {
+        level: process.env.NODE_ENV !== 'production' ? 'debug' : 'info',
+        transport:
+          process.env.NODE_ENV !== 'production'
+            ? { target: 'pino-pretty', options: { singleLine: true } }
+            : undefined,
+      },
     }),
     PrismaModule,
     RedisModule,

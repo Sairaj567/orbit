@@ -6,10 +6,15 @@ import { useWorkspaceStore } from '../stores/workspace.store';
 import { useProjectStore } from '../stores/project.store';
 import type { RealtimeEvent, RealtimePayload } from '@orbit/shared';
 
+import { env } from '../config/env';
+
 interface RealtimeContextValue {
   socket: Socket | null;
   isConnected: boolean;
-  subscribe: <T extends RealtimeEvent>(event: T, callback: (payload: RealtimePayload<T>) => void) => () => void;
+  subscribe: <T extends RealtimeEvent>(
+    event: T,
+    callback: (payload: RealtimePayload<T>) => void,
+  ) => () => void;
 }
 
 const RealtimeContext = createContext<RealtimeContextValue>({
@@ -43,8 +48,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         const token = await getToken();
         if (!token || !isActive) return;
 
-        const wsUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-        
+        const wsUrl = env.wsUrl || env.apiUrl || window.location.origin;
+
         const newSocket = io(wsUrl, {
           auth: { token },
           transports: ['websocket'],
@@ -105,18 +110,18 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     };
   }, [socket, isConnected, currentWorkspaceId, currentProjectId]);
 
-  const subscribe = useCallback(<T extends RealtimeEvent>(
-    event: T,
-    callback: (payload: RealtimePayload<T>) => void
-  ) => {
-    if (!socket) return () => {};
+  const subscribe = useCallback(
+    <T extends RealtimeEvent>(event: T, callback: (payload: RealtimePayload<T>) => void) => {
+      if (!socket) return () => {};
 
-    socket.on(event as string, callback as (...args: unknown[]) => void);
+      socket.on(event as string, callback as (...args: unknown[]) => void);
 
-    return () => {
-      socket.off(event as string, callback as (...args: unknown[]) => void);
-    };
-  }, [socket]);
+      return () => {
+        socket.off(event as string, callback as (...args: unknown[]) => void);
+      };
+    },
+    [socket],
+  );
 
   return (
     <RealtimeContext.Provider value={{ socket, isConnected, subscribe }}>

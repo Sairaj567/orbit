@@ -28,10 +28,30 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router'],
-          query: ['@tanstack/react-query'],
-          motion: ['framer-motion'],
+        manualChunks(id) {
+          const normalized = id.replace(/\\/g, '/');
+          if (
+            normalized.includes('node_modules/react/') ||
+            normalized.includes('node_modules/react-dom/') ||
+            normalized.includes('node_modules/react-router/') ||
+            normalized.includes('node_modules/react-is/') ||
+            normalized.includes('node_modules/scheduler/')
+          ) {
+            return 'vendor';
+          }
+          if (
+            normalized.includes('node_modules/@tanstack/react-query/') ||
+            normalized.includes('node_modules/@tanstack/query-core/')
+          ) {
+            return 'query';
+          }
+          if (
+            normalized.includes('node_modules/framer-motion/') ||
+            normalized.includes('node_modules/motion-dom/') ||
+            normalized.includes('node_modules/motion-utils/')
+          ) {
+            return 'motion';
+          }
         },
       },
     },

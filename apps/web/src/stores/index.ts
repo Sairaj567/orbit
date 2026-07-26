@@ -1,5 +1,4 @@
 export * from './accessibility.store';
-export * from './notification.store';
 export * from './presence.store';
 export * from './sound.store';
 export * from './theme.store';

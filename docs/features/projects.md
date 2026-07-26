@@ -1,5 +1,7 @@
 # Projects
 
+> **Status: Partial.** The router exposes `workspaceSlug`, while `ProjectsPage` and `ProjectLayout` read `workspaceId` and fall back to `home`; the Project Hub is not operational until this mismatch is repaired.
+
 Projects are the central hub for workspaces. A Project serves as the container for tasks, notes, and resources, acting as a mini-dashboard where users spend the majority of their time in Orbit.
 
 ## Current Architecture (Milestone 5.4)
@@ -7,6 +9,7 @@ Projects are the central hub for workspaces. A Project serves as the container f
 The Project Hub uses nested routing under `/projects/:projectId/` using `react-router`:
 
 ### Tabbed Navigation
+
 - **Overview**: Dashboard summary showing recent tasks, notes, and resources.
 - **Tasks**: Scoped view specifically for managing the project's tasks.
 - **Notes**: Scoped view for creating and managing project notes.

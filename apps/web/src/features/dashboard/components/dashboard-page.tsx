@@ -1,13 +1,17 @@
+import { lazy, Suspense } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { useDashboard } from '../hooks/use-dashboard';
 import { ProductivityCards } from './productivity-cards';
-import { DashboardCharts } from './dashboard-charts';
 import { RecentProjects } from './recent-projects';
 import { ActivityItem } from '@/features/activity/components/activity-item';
 import { TaskListItem } from '@/features/tasks/components/task-list-item';
 import { HabitCard } from '@/features/habits/components/habit-card';
 import { Sparkles } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+
+const DashboardCharts = lazy(() =>
+  import('./dashboard-charts').then((m) => ({ default: m.DashboardCharts })),
+);
 
 export function Dashboard() {
   const { data: dashboard, isLoading, error } = useDashboard();
@@ -17,7 +21,9 @@ export function Dashboard() {
       <div className="space-y-8 animate-pulse">
         <PageHeader title="Dashboard" description="Loading your productivity command center..." />
         <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
-          {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-24 rounded-xl" />
+          ))}
         </div>
         <div className="grid gap-6 md:grid-cols-2">
           <Skeleton className="h-64 rounded-xl" />
@@ -46,9 +52,11 @@ export function Dashboard() {
       />
 
       <ProductivityCards stats={stats} />
-      
-      <DashboardCharts stats={stats} />
-      
+
+      <Suspense fallback={<Skeleton className="h-64 rounded-xl" />}>
+        <DashboardCharts stats={stats} />
+      </Suspense>
+
       <RecentProjects projects={projects} />
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -61,10 +69,10 @@ export function Dashboard() {
             </div>
           ) : (
             <div className="rounded-xl border border-border/70 bg-card shadow-sm overflow-hidden divide-y divide-border/50">
-              {today.overdueTasks.map(task => (
+              {today.overdueTasks.map((task) => (
                 <TaskListItem key={task.id} task={task} />
               ))}
-              {today.tasks.map(task => (
+              {today.tasks.map((task) => (
                 <TaskListItem key={task.id} task={task} />
               ))}
             </div>
@@ -80,7 +88,7 @@ export function Dashboard() {
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
-              {today.habits.slice(0, 4).map(habit => (
+              {today.habits.slice(0, 4).map((habit) => (
                 <HabitCard key={habit.id} habit={habit} />
               ))}
             </div>
@@ -93,7 +101,7 @@ export function Dashboard() {
         <h3 className="text-lg font-semibold tracking-tight text-foreground">Recent Activity</h3>
         <div className="rounded-xl border border-border/70 bg-card/75 p-5 shadow-sm">
           {activity.length === 0 ? (
-             <p className="text-sm text-muted-foreground">No recent activity found.</p>
+            <p className="text-sm text-muted-foreground">No recent activity found.</p>
           ) : (
             <div className="divide-y">
               {activity.map((act) => (

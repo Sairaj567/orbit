@@ -19,7 +19,9 @@ function buildBreadcrumbs(pathname: string, workspace: WorkspaceOption): Breadcr
   const normalized = stripWorkspaceBasePath(pathname, workspace.slug) || '/dashboard';
   const segments = normalized.split('/').filter(Boolean);
 
-  const crumbs: BreadcrumbItem[] = [{ label: workspace.name, href: getWorkspaceDashboardPath(workspace.slug) }];
+  const crumbs: BreadcrumbItem[] = [
+    { label: workspace.name, href: getWorkspaceDashboardPath(workspace.slug) },
+  ];
 
   const labels: Record<string, string> = {
     dashboard: 'Dashboard',
@@ -30,7 +32,6 @@ function buildBreadcrumbs(pathname: string, workspace: WorkspaceOption): Breadcr
     calendar: 'Calendar',
     analytics: 'Analytics',
     activity: 'Activity',
-    achievements: 'Achievements',
     'workspace-settings': 'Workspace Settings',
     settings: 'Settings',
   };
@@ -46,43 +47,19 @@ function buildBreadcrumbs(pathname: string, workspace: WorkspaceOption): Breadcr
   return crumbs;
 }
 
-function getNotificationPreview() {
-  return [
-    {
-      id: 'notify-1',
-      title: 'Task completed',
-      description: 'Prisma schema refactor moved to Done.',
-    },
-    {
-      id: 'notify-2',
-      title: 'Habit streak',
-      description: 'Coffee break streak reached 12 days.',
-    },
-    {
-      id: 'notify-3',
-      title: 'Workspace update',
-      description: '3 members are currently active in Studio Sprint.',
-    },
-  ];
-}
-
 export function AppShell({ children }: AppShellProps) {
   const location = useLocation();
   const { loading, setWorkspaceSlug, workspace, workspaces } = useWorkspaceContext();
   const [collapsed, setCollapsed] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const pathname = location.pathname;
   const breadcrumbs = useMemo(() => buildBreadcrumbs(pathname, workspace), [pathname, workspace]);
-  const notificationCount = 3;
-  const notificationPreview = useMemo(() => getNotificationPreview(), []);
   const activePath = stripWorkspaceBasePath(pathname, workspace.slug) || '/dashboard';
 
   const handleCloseOverlays = () => {
     setSearchOpen(false);
     setQuickAddOpen(false);
-    setNotificationsOpen(false);
   };
 
   return (
@@ -107,10 +84,8 @@ export function AppShell({ children }: AppShellProps) {
             breadcrumbs={breadcrumbs}
             workspace={workspace}
             workspaceSlug={workspace.slug}
-            notificationCount={notificationCount}
             onSearch={() => setSearchOpen(true)}
             onQuickAdd={() => setQuickAddOpen(true)}
-            onNotifications={() => setNotificationsOpen((value) => !value)}
           />
 
           <main className="flex-1 px-4 pb-24 pt-5 sm:px-6 lg:px-8">
@@ -151,19 +126,6 @@ export function AppShell({ children }: AppShellProps) {
           </div>
         </OverlayShell>
       ) : null}
-
-      {notificationsOpen ? (
-        <OverlayShell title="Notifications" onClose={handleCloseOverlays} compact align="right">
-          <div className="space-y-2">
-            {notificationPreview.map((notification) => (
-              <div key={notification.id} className="rounded-2xl border border-border/70 bg-muted/30 px-3 py-3">
-                <p className="text-sm font-medium text-foreground">{notification.title}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{notification.description}</p>
-              </div>
-            ))}
-          </div>
-        </OverlayShell>
-      ) : null}
     </div>
   );
 }
@@ -176,7 +138,13 @@ interface OverlayShellProps {
   align?: 'center' | 'right';
 }
 
-function OverlayShell({ title, children, onClose, compact = false, align = 'center' }: OverlayShellProps) {
+function OverlayShell({
+  title,
+  children,
+  onClose,
+  compact = false,
+  align = 'center',
+}: OverlayShellProps) {
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/60 px-4 py-6 backdrop-blur-md">
       <button

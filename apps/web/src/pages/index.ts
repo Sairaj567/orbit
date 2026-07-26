@@ -1,4 +1,3 @@
-export { AchievementsPage } from './achievements';
 export { ActivityPage } from './activity';
 export { AnalyticsPage } from './analytics';
 export { CalendarPage } from './calendar';

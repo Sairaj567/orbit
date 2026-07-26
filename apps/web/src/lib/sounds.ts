@@ -1,4 +1,4 @@
-type SoundName = 'task_complete' | 'click' | 'timer_start' | 'timer_pause' | 'achievement' | 'warning' | string;
+type SoundName = 'task_complete' | 'click' | 'timer_start' | 'timer_pause' | 'warning' | string;
 
 class SoundEngine {
   private context: AudioContext | null = null;
@@ -13,8 +13,6 @@ class SoundEngine {
         return [330, 'sine', 0.1];
       case 'timer_pause':
         return [440, 'sine', 0.1];
-      case 'achievement':
-        return [783.99, 'sine', 0.35];
       case 'warning':
         return [180, 'sawtooth', 0.18];
       default:

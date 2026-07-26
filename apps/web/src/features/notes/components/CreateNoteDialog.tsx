@@ -1,11 +1,9 @@
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { NoteEditor } from './NoteEditor';
+import { lazy, Suspense } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useCreateNote } from '../hooks/use-notes';
+
+const NoteEditor = lazy(() => import('./NoteEditor').then((m) => ({ default: m.NoteEditor })));
 
 interface CreateNoteDialogProps {
   workspaceId: string;
@@ -15,7 +13,13 @@ interface CreateNoteDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export function CreateNoteDialog({ workspaceId, projectId, taskId, open, onOpenChange }: CreateNoteDialogProps) {
+export function CreateNoteDialog({
+  workspaceId,
+  projectId,
+  taskId,
+  open,
+  onOpenChange,
+}: CreateNoteDialogProps) {
   const { mutate: createNote, isPending } = useCreateNote(workspaceId);
 
   const handleSave = (title: string, content: string) => {
@@ -25,7 +29,7 @@ export function CreateNoteDialog({ workspaceId, projectId, taskId, open, onOpenC
         onSuccess: () => {
           onOpenChange(false);
         },
-      }
+      },
     );
   };
 
@@ -35,13 +39,15 @@ export function CreateNoteDialog({ workspaceId, projectId, taskId, open, onOpenC
         <DialogHeader>
           <DialogTitle>Create Note</DialogTitle>
         </DialogHeader>
-        
+
         <div className="flex-1 mt-4">
-          <NoteEditor
-            onSave={handleSave}
-            onCancel={() => onOpenChange(false)}
-            isSaving={isPending}
-          />
+          <Suspense fallback={<Skeleton className="h-48 w-full rounded-xl" />}>
+            <NoteEditor
+              onSave={handleSave}
+              onCancel={() => onOpenChange(false)}
+              isSaving={isPending}
+            />
+          </Suspense>
         </div>
       </DialogContent>
     </Dialog>

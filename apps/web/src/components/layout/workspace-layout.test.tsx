@@ -224,4 +224,43 @@ describe('WorkspaceLayout Component & Integration Test', () => {
       ),
     ).toBeInTheDocument();
   });
+
+  it('regression: does not render Achievements navigation item or Notification bell', async () => {
+    vi.spyOn(workspaceHooks, 'useWorkspaces').mockReturnValue({
+      data: mockRealApiWorkspaces,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof workspaceHooks.useWorkspaces>);
+
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/w/orbit-seed-demo/dashboard']}>
+          <Routes>
+            <Route
+              path="/w/:workspaceSlug/*"
+              element={
+                <WorkspaceLayout>
+                  <div>Content</div>
+                </WorkspaceLayout>
+              }
+            />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Orbit Demo').length).toBeGreaterThan(0);
+    });
+
+    // Confirm nav/sidebar no longer renders Achievements
+    expect(screen.queryByText('Achievements')).toBeNull();
+
+    // Confirm TopBar no longer renders Notification button/bell
+    expect(screen.queryByRole('button', { name: /notifications/i })).toBeNull();
+    expect(screen.queryByLabelText(/notifications/i)).toBeNull();
+  });
 });

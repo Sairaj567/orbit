@@ -8,7 +8,6 @@ export const ROUTES = {
   notes: '/w/:workspaceSlug/notes',
   calendar: '/w/:workspaceSlug/calendar',
   analytics: '/w/:workspaceSlug/analytics',
-  achievements: '/w/:workspaceSlug/achievements',
   activity: '/w/:workspaceSlug/activity',
   settings: '/w/:workspaceSlug/settings',
   workspaceSettings: '/w/:workspaceSlug/workspace-settings',

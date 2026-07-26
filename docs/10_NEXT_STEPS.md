@@ -1,27 +1,28 @@
 # 10 Next Steps
 
-## Current Priority
+**Current priority:** Production-readiness Phase 0.
 
-**Milestone 8.0 — Polish & AI Integration**
+## Now
 
-With the real-time foundation, study blocks, and the productivity dashboard established, the next logical step is to introduce AI features and Gamification.
+1. Keep the documentation aligned with [Feature Completeness Report](./FEATURE_COMPLETENESS_REPORT.md).
+2. Make CI execute fresh verification and container-image builds for release candidates.
+3. Verify the database-dependent E2E suite in CI before every release candidate.
 
-### 1. AI Summaries & Semantic Search
-- Implement AI summaries for long notes.
-- Use vector embeddings for semantic search across tasks, notes, and resources.
+## Next: core blockers
 
-## Upcoming Milestones
-- **Phase 8: Polish & AI** (AI summaries, semantic search)
-- **Phase 9: Gamification** (XP, Levels, Achievements)
+1. Fix Project Hub routing (`workspaceSlug` versus `workspaceId`).
+2. Add real protected-route behavior.
+3. Close Dashboard and AI project-membership data leaks.
+4. Stabilize Socket.IO connection lifecycle and event/query invalidation coverage.
 
-## Next
-1. **Prisma Schema Expansion**: Add remaining fields for XP and Level calculation engine if needed.
-2. **AI Integration**: Connect to an LLM provider (OpenAI / Anthropic) to generate automatic summaries.
+## Then: finish existing workflows
 
-## Future
-1. WebSockets for real-time multiplayer cursor/status sync.
-2. Analytics and Activity feeds backend queues.
-3. Gamification XP and Level calculation engine.
+- Task comments and deep-link detail.
+- Invitation lifecycle.
+- Habit/study correctness and history.
+- Project settings/activity.
+- Real historical analytics.
 
-## Technical Debt
-- Ensure shared types are strictly enforced and avoid code duplication between `web` and `api` before the codebase grows too large.
+## Do not start yet
+
+- Achievements, notifications, more AI surfaces, or calendar integrations. These are not production-ready feature foundations.

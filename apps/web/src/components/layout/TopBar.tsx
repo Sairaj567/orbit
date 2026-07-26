@@ -1,6 +1,5 @@
 import type { BreadcrumbItem, WorkspaceOption } from '@/config/navigation';
 import { Breadcrumbs } from './Breadcrumbs';
-import { NotificationButton } from './NotificationButton';
 import { QuickAddButton } from './QuickAddButton';
 import { SearchTrigger } from './SearchTrigger';
 import { UserMenu } from './UserMenu';
@@ -10,20 +9,16 @@ interface TopBarProps {
   breadcrumbs: BreadcrumbItem[];
   workspace: WorkspaceOption;
   workspaceSlug: string;
-  notificationCount: number;
   onSearch: () => void;
   onQuickAdd: () => void;
-  onNotifications: () => void;
 }
 
 export function TopBar({
   breadcrumbs,
   workspace,
   workspaceSlug,
-  notificationCount,
   onSearch,
   onQuickAdd,
-  onNotifications,
 }: TopBarProps) {
   return (
     <header className="sticky top-0 z-30 border-b border-border/70 bg-background/70 backdrop-blur-xl">
@@ -48,9 +43,13 @@ export function TopBar({
             <ConnectionStatus />
             <QuickAddButton onClick={onQuickAdd} />
           </div>
-          <NotificationButton count={notificationCount} onClick={onNotifications} />
           <div className="hidden lg:block">
-            <UserMenu name="Saira Khan" role={workspace.role} email="saira@orbit.app" workspaceSlug={workspaceSlug} />
+            <UserMenu
+              name="Saira Khan"
+              role={workspace.role}
+              email="saira@orbit.app"
+              workspaceSlug={workspaceSlug}
+            />
           </div>
         </div>
       </div>
