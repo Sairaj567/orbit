@@ -81,4 +81,32 @@ export class UserProvisioningService {
       throw error;
     }
   }
+
+  /**
+   * Provisions a fixed dev user via Prisma only (no Clerk API calls).
+   * Used exclusively when AUTH_MODE=dev_bypass.
+   */
+  async provisionDevUser() {
+    this.logger.log('Provisioning fixed dev user (AUTH_MODE=dev_bypass)');
+
+    return this.prisma.user.upsert({
+      where: { clerkId: 'dev_user_orbit' },
+      update: {
+        deletedAt: null,
+      },
+      create: {
+        clerkId: 'dev_user_orbit',
+        email: 'dev@orbit.local',
+        displayName: 'Dev User (Bypass)',
+      },
+      select: {
+        id: true,
+        clerkId: true,
+        email: true,
+        displayName: true,
+        avatarUrl: true,
+        timezone: true,
+      },
+    });
+  }
 }

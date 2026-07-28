@@ -45,6 +45,29 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   async handleConnection(client: AuthenticatedSocket) {
     try {
+      // --- DEV BYPASS: skip all Clerk verification ---
+      const authMode = this.configService.get<string>('AUTH_MODE');
+      if (authMode === 'dev_bypass') {
+        const devUser = await this.userProvisioningService.provisionDevUser();
+        client.user = {
+          id: devUser.id,
+          clerkId: devUser.clerkId,
+          email: devUser.email,
+        };
+
+        let sockets = this.userSockets.get(devUser.id);
+        if (!sockets) {
+          sockets = new Set();
+          this.userSockets.set(devUser.id, sockets);
+        }
+        sockets.add(client);
+
+        this.logger.log(`[DEV BYPASS] Client connected: ${client.id} (Dev User: ${devUser.id})`);
+        client.emit('authenticated', { userId: devUser.id });
+        return;
+      }
+      // --- END DEV BYPASS ---
+
       // Extract token from handshake auth
       const token = client.handshake.auth?.token;
 

@@ -15,6 +15,21 @@ export class ClerkAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+
+    // --- DEV BYPASS: skip all Clerk verification ---
+    const authMode = this.configService.get<string>('AUTH_MODE');
+    if (authMode === 'dev_bypass') {
+      const devUser = await this.userProvisioningService.provisionDevUser();
+      request.auth = {
+        clerkId: 'dev_user_orbit',
+        sessionId: 'dev_session',
+        tokenType: 'dev',
+      };
+      request.user = devUser;
+      return true;
+    }
+    // --- END DEV BYPASS ---
+
     const token = this.extractBearerToken(request.headers.authorization);
 
     if (!token) {

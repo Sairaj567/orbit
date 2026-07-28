@@ -5,6 +5,7 @@ const logger = new Logger('EnvValidation');
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  AUTH_MODE: z.enum(['clerk', 'dev_bypass']).default('clerk'),
   PORT: z
     .string()
     .optional()
@@ -60,6 +61,14 @@ export function validateEnv(config: Record<string, unknown>): Record<string, unk
 
   // Strict Production Enforcement Rules
   if (isProd) {
+    // HARD SAFETY RAIL: dev_bypass must NEVER run in production
+    if (parsed.AUTH_MODE === 'dev_bypass') {
+      const message =
+        '[FATAL] AUTH_MODE=dev_bypass is FORBIDDEN when NODE_ENV=production. Aborting process.';
+      logger.error(message);
+      throw new Error(message);
+    }
+
     const missingProdSecrets: string[] = [];
 
     if (!parsed.CLERK_SECRET_KEY || parsed.CLERK_SECRET_KEY.trim() === '') {
@@ -94,6 +103,18 @@ export function validateEnv(config: Record<string, unknown>): Record<string, unk
 
     if (missingOptional.length > 0) {
       logger.warn(`Dev mode optional environment variables not set: ${missingOptional.join(', ')}`);
+    }
+
+    // Loud startup warning when auth is bypassed
+    if (parsed.AUTH_MODE === 'dev_bypass') {
+      logger.warn('');
+      logger.warn('╔══════════════════════════════════════════════════════════════╗');
+      logger.warn('║  ⚠️  AUTH_MODE = dev_bypass — AUTHENTICATION IS DISABLED   ║');
+      logger.warn('║                                                              ║');
+      logger.warn('║  All requests will be authenticated as dev_user_orbit.       ║');
+      logger.warn('║  DO NOT run this outside a trusted LAN.                      ║');
+      logger.warn('╚══════════════════════════════════════════════════════════════╝');
+      logger.warn('');
     }
   }
 
