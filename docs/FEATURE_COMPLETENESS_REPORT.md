@@ -1,372 +1,344 @@
 # Orbit Feature Completeness & Production Readiness Audit
 
-**Audit date:** 2026-07-26
-**Scope:** Current working tree only: API, web client, shared package, Prisma schema/migrations, Docker, CI, tests, and product documentation. No application code was modified. This file is the requested audit output.
+**Audit date:** 2026-07-28
+**Scope:** Current working tree only. API, web client, shared package, Prisma schema and migrations, tests, Docker/CI, and documentation were inspected. No application code was changed. This report is the only requested output-file change.
 
-## Assessment method and rubric
+## Method and evidence
 
-This report treats an implementation as complete only where the endpoint, persistence, authorization, UI, and client integration are all present and mutually compatible. A page, controller, schema field, or documentation claim alone is not evidence of completion.
+A feature was credited only when its route or UI is backed by a real implementation and the relevant authorization, persistence, client integration, states, and navigation were present. A model, route, controller, static page, or documentation claim by itself was not treated as completion.
 
-Scores are deliberately strict:
+Verification run on this working tree:
 
-- **9–10:** verified end-to-end feature with production-quality state, access, and operational handling.
-- **6–8:** real end-to-end functionality, but material workflow or hardening gaps remain.
-- **3–5:** substantial pieces exist, but a key path is incomplete, unreliable, or placeholder-backed.
-- **0–2:** static shell, isolated scaffolding, or missing implementation.
+- `pnpm typecheck` - passed.
+- `pnpm lint` - passed.
+- `pnpm test` - passed: 70 API, 13 web, and 4 shared-package tests (87 total).
+- Database-backed E2E tests were not run locally; the configured PostgreSQL and Redis test services were not started for this audit. CI is configured to run them.
 
-### Verified checks
-
-- `pnpm typecheck` — passed (Turbo cache replayed).
-- `pnpm lint` — passed (Turbo cache replayed).
-- `pnpm test` — passed: 70 API, 4 shared, and 9 web tests.
-- The database-dependent E2E suite was not run locally; it needs the configured PostgreSQL/Redis test services. CI is configured to run it.
+Score guide: 9-10 is production-quality end-to-end behavior; 6-8 is real functionality with material gaps; 3-5 is partial or unreliable; 0-2 is absent or only presentation/scaffolding.
 
 ## Executive assessment
 
-Orbit has a real Nest/Prisma/React application with functioning domain services, shared validation, authentication plumbing, workspace resolution by ID **or slug**, and meaningful automated tests. It is not production ready.
+Orbit is a genuine NestJS/Prisma/React product foundation, not a mock repository. It has authenticated API plumbing, shared contracts, persisted core domains, React Query clients, role checks, activity records, Socket.IO rooms, CI, and a deployable single-VM Docker composition. It is **not production ready** because central workflows and data boundaries remain incomplete.
 
-The largest verified blockers are:
+The most consequential verified blockers are:
 
-1. The Projects route and every nested Project Hub route read a nonexistent `workspaceId` route parameter and therefore call APIs and build links with the fallback value `home`, rather than the router's `workspaceSlug`.
-2. The client has no actual route guard: `ProtectedLayout` renders children unconditionally. Clerk is configured, but signed-out navigation reaches the application shell and relies on individual requests failing.
-3. Realtime is not dependable end-to-end. `RealtimeProvider` recreates its socket whenever its own `socket` state changes; task updates/deletes are never broadcast; habits have no client subscription; and several invalidation keys do not match their queries.
-4. Project membership is not applied to dashboard data or AI semantic-search results. A workspace member can receive data from projects to which they are not a project member.
-5. Analytics contains fabricated fallback KPIs and charts explicitly derived from mock weekly distribution data. Achievements are a hard-coded static page.
+1. `ProjectsPage` and `ProjectLayout` read a nonexistent `workspaceId` router parameter even though the route exposes `workspaceSlug`; both fall back to `home`. Project listing, project routes, and all Project Hub tabs are therefore non-operational for normal workspace URLs.
+2. `ProtectedLayout` is a fragment rather than an access guard. A signed-out user can render the application shell and only encounters authorization failures from requests.
+3. Socket lifecycle and cache synchronization are not dependable. The provider recreates the socket after its own `socket` state changes; task update/delete events are never emitted; habits are never subscribed; and several invalidation prefixes do not match their actual query keys.
+4. Dashboard aggregation and AI semantic search are only workspace-scoped. They do not consistently apply project-membership access and can expose project data to a workspace member without project access.
+5. Project settings and project activity are visible shells, task deep-link detail is a shell, analytics presents fabricated chart points, and Achievements/Notifications have no current product surface or backend.
 
 ## Feature audit
 
-### Authentication — **Functional but Missing Polish**
+### Authentication - Functional but Missing Polish
 
-**Overview.** Clerk JWT verification, local user storage, just-in-time user provisioning, signed webhook handling, and a `/users/me` profile API are implemented.
+**Overview.** Clerk JWT verification, local-user provisioning, signed Clerk webhooks, soft deletion, and a development bypass are implemented. The client lacks actual route protection UX.
 
-**Backend — 7/10.** `ClerkAuthGuard` verifies a bearer token and attaches a local user. Missing local users are provisioned through Clerk; a signed Svix webhook handles user create/update/delete, and deletion includes ownership/task cleanup. The `User` model supports soft deletion and profile preferences, and profile updates use shared Zod validation. The guard and provisioning service have tests. The webhook requires correct external secret configuration and there is no documented operational retry/dead-letter strategy.
+**Backend - 7/10.** `ClerkAuthGuard` verifies bearer tokens, rejects soft-deleted users, and provisions a local user on first request. Signed Svix webhook handling supports Clerk lifecycle events, and user profile DTO validation is shared. The guard, provisioning, and webhook service have tests. `AUTH_MODE=dev_bypass` provisions a fixed local identity and the server rejects that mode in production. There is no documented webhook retry/dead-letter/reconciliation process.
 
-**Frontend — 4/10.** ClerkProvider, profile settings, and the API token flow are present. `ProtectedLayout` is only a fragment, so it does not render loading, sign-in, unauthorized, or redirect behavior. The top-bar user name and email remain hard-coded (`Saira Khan`, `saira@orbit.app`) rather than using Clerk or the profile API. There is no application-owned sign-in/sign-up or access-denied experience.
+**Frontend - 4/10.** ClerkProvider is conditionally configured and the app can intentionally run in local dev-bypass mode. Profile settings are real. `ProtectedLayout` renders children without loading, sign-in, redirect, or forbidden handling. The top-bar identity is static rather than sourced from the signed-in user/profile.
 
-**Integration — 6/10.** Feature clients generally obtain Clerk tokens and use the normalized `/api/v1` path. User profile and update hooks use the API envelope correctly. The workspace guard now resolves both slug and database ID, fixing the historical slug-only concern. The UI does not gate access before API requests fail.
+**Integration - 6/10.** Feature clients obtain tokens through the auth abstraction and use `/api/v1`. Workspace server guards resolve both database IDs and slugs. The frontend does not prevent unauthenticated navigation before requests fail.
 
-**Production Readiness:** **Functional but Missing Polish**.
+**Verified missing functionality:** real protected-route/sign-in/denied UX; dynamic shell identity; operational webhook retry/reconciliation documentation.
 
-**Verified missing functionality:** route protection/sign-in state UX; dynamic shell identity; operational webhook retry/reconciliation documentation.
+### Workspaces - Partial
 
-### Workspaces — **Partial**
+**Overview.** A user can load active workspaces, switch by slug, and an owner/admin can update metadata. The API can create a workspace, but the product cannot create one.
 
-**Overview.** Users can list their active workspaces and owners/admins can edit workspace metadata. Backend creation exists, but the product lacks a workspace creation flow.
+**Backend - 6/10.** Create/list/update operations use shared Zod schemas, persist owner membership atomically, exclude soft-deleted workspaces, and enforce active membership/role checks. No archive/delete/restore or invite-code join lifecycle is exposed. Workspace changes do not record activity or broadcast a workspace event.
 
-**Backend — 6/10.** `WorkspacesController` exposes create/list/update; shared Zod schemas validate name, slug, description, and avatar URL. Creation atomically creates the owner membership; list excludes deleted workspaces and returns the member role. `WorkspaceMembershipGuard` resolves IDs or slugs and enforces active membership. There is no delete/archive/restore endpoint, invite-code join flow, workspace activity log, or workspace realtime event.
+**Frontend - 5/10.** The switcher and settings form use real data with loading, error, empty, read-only, responsive, and mutation-success behavior. There is no create, archive, delete, restore, or join flow.
 
-**Frontend — 5/10.** The shell loads workspaces through React Query and has real loading, error, and zero-workspace states. The switcher is driven by API data, and workspace details include client validation, mutation feedback, read-only behavior, and responsive layout. No UI creates a first workspace, archives one, joins one, or manages invite codes.
+**Integration - 7/10.** The stored workspace ID/slug and slug-based navigation are compatible with the server guard. A slug update navigates to the changed URL. There is no workspace realtime flow and metadata cache handling is limited to the local mutation path.
 
-**Integration — 7/10.** Workspace data uses the shared response envelope and stores the real ID plus slug. Navigation is slug-based, which the API guard supports. Updating a slug navigates to the new URL. The workspace cache is not updated/revalidated after metadata mutation beyond the individual mutation path, and no realtime handling exists.
+**Verified missing functionality:** UI creation; archive/delete/restore; invite-code join lifecycle; workspace activity and realtime.
 
-**Production Readiness:** **Partial**.
+### Members - Functional but Missing Polish
 
-**Verified missing functionality:** UI workspace creation; archive/delete/restore; invite-code/join lifecycle; workspace activity and realtime.
+**Overview.** Workspace membership list, invitation-record creation, role changes, removal, activity records, and Socket.IO broadcasts exist.
 
-### Members — **Functional but Missing Polish**
+**Backend - 6/10.** Class-validator DTOs, owner/admin mutation checks, owner/self-removal protections, persistence, activity records, broadcasts, and socket eviction are present. An existing user is made active immediately; an unknown email only creates a pending row. There is no email delivery, acceptance, expiry, revocation, or automatic linking when that person later creates a Clerk account.
 
-**Overview.** Workspace member list, invite record creation, role change, removal, activity records, and socket broadcasts exist.
+**Frontend - 6/10.** Roster, invite dialog, role-aware controls, loading/empty states, and responsive rows are implemented. Browser confirmation is used for removal. There is no pending-invitation management, resend/revoke flow, server-side member search, or dedicated destructive/error presentation.
 
-**Backend — 6/10.** Member DTOs use class-validator. Owner/admin-only mutation routes, owner protection, self-removal protection, persistence, activity logging, socket broadcasts, and socket eviction are implemented. Inviting an existing user makes them active immediately; inviting an unknown email only creates a pending record. There is no delivery, acceptance, expiry, revocation, or eventual linking of that pending invite after a matching Clerk user appears.
+**Integration - 6/10.** React Query clients consume the envelope and member events invalidate the `['members']` prefix used by the hooks. Command Palette member search is limited to already-cached members.
 
-**Frontend — 6/10.** Member roster and invite dialog are implemented with loading, empty, role-aware controls, and responsive presentation. Workspace settings determines the user's role from the loaded membership list. Deletion uses browser confirmation and there is no dedicated pending-invitation management or invitation resend/revoke experience.
+**Verified missing functionality:** invitation delivery/acceptance/expiry/revocation; pending-invitation lifecycle; server search; dedicated destructive-action/error UX.
 
-**Integration — 6/10.** React Query clients consume the envelope and workspace slugs resolve at the API. Member realtime invalidation uses the `['members']` prefix and can refresh member queries. Command-palette member search only searches cached data.
+### Projects - Partial
 
-**Production Readiness:** **Functional but Missing Polish**.
+**Overview.** Project CRUD and a multi-tab Project Hub are implemented in source, but main project navigation is broken by the route-parameter mismatch.
 
-**Verified missing functionality:** invitation delivery/acceptance/expiry/revocation; pending invitation lifecycle; server-side member search; dedicated destructive-action/error UX.
+**Backend - 6/10.** Create/list/read/update/archive operations use shared inputs, Prisma persistence, creator-as-owner membership, project-role checks, activity logging, and broadcasts. `findAll` requires a `ProjectMember` even for `WORKSPACE` visibility, so workspace-visible semantics are not implemented. Lists do not explicitly filter soft-deleted projects. Update/delete activity is attributed to the creator rather than the requester.
 
-### Projects — **Partial**
+**Frontend - 3/10.** Cards, nested tabs, scoped overview/tasks/habits/notes/resources pages, responsive tabs, and some states are real. There is no project-create UI. Settings inputs are enabled but Save, Archive, and Delete are permanently disabled. Project activity is a static empty state. `workspaceId` is read from route params instead of `workspaceSlug`, so listing, lookup, API calls, and links use `home`.
 
-**Overview.** Project CRUD, project membership records, and a multi-tab Project Hub are present in source, but the main project navigation is currently broken.
+**Integration - 3/10.** Clients and server slug resolution are compatible in isolation, but the wrong parameter prevents actual use. Project-created broadcasts target only the new project room, which no user can normally have joined before it exists; invalidation does not cover every project query key.
 
-**Backend — 6/10.** CRUD has shared Zod validation, Prisma persistence, creator-as-owner membership creation, project-role enforcement, activity logging, and broadcasts. `findAll` only returns projects having a `ProjectMember` record; the `WORKSPACE` visibility enum is therefore not implemented as workspace-wide visibility. Lists do not explicitly exclude soft-deleted projects. Delete is an archive/soft-delete operation. Update/delete activity attributes the action to `creatorId`, not the requester.
+**Verified missing functionality:** working route parameter integration; create UI; usable settings/archive/delete UI; rendered project activity; `WORKSPACE` visibility semantics; deleted-project filtering; accurate activity actor attribution.
 
-**Frontend — 3/10.** The project cards, responsive nested tabs, scoped overview/tasks/habits/notes/resources pages, and several loading/empty states are implemented. There is no project creation interface. Project settings is a visibly scaffolded form: inputs are enabled but save/archive/delete controls are permanently disabled. Project activity is a static empty-state shell. Crucially, `ProjectsPage` and `ProjectLayout` destructure `workspaceId` from router params, but the route defines `:workspaceSlug`; both fall back to `home`. This breaks listing, project lookup, child API calls, and child links for normal workspace URLs.
+### Project Permissions - Partial
 
-**Integration — 3/10.** API envelopes and workspace-slug resolution work. The incorrect route parameter prevents the UI from using that integration. Project-created broadcasts target only the new project's room; a user cannot normally be in that room before project creation. Realtime invalidation does not cover every project query key.
+**Overview.** Project viewer/editor/owner authorization and project-member CRUD are centralized, but boundary validation and usable UI are incomplete.
 
-**Production Readiness:** **Partial**.
+**Backend - 6/10.** Permission checks confirm active workspace membership, correct workspace ownership, and role rank. Project-member list/invite/change/remove enforce final-owner and self-leave rules. Controller bodies are inline TypeScript shapes rather than DTOs, so member IDs/roles are not validated at the boundary. Inviting does not verify that the target workspace-member row belongs to the routed workspace. Changes broadcast and evict sockets, but create/update/remove do not create activity records.
 
-**Verified missing functionality:** working route-param integration; create project UI; usable settings/archive/delete UI; rendered project activity feed; `WORKSPACE` visibility semantics; deleted-project filtering; accurate activity actor attribution.
+**Frontend - 4/10.** A member list and invite dialog exist in Project Settings, which is itself inaccessible through the broken Project Hub. Controls are not consistently hidden/disabled for viewers and feedback/error states are sparse.
 
-### Project Permissions — **Partial**
+**Integration - 3/10.** Query/mutation hooks are real but depend on the broken workspace value. `useRealtimeSync` neither subscribes to nor invalidates project-member event keys.
 
-**Overview.** Project viewer/editor/owner checks are centralized and Project Member CRUD exists.
+**Verified missing functionality:** validated DTOs; target workspace-member ownership verification; activity records; role-aware UI; realtime cache handling; working Project Hub route.
 
-**Backend — 6/10.** `ProjectPermissionsService` confirms active workspace membership, project workspace ownership, and rank. Project-member list/invite/update/remove endpoints use it; the final-owner rule and self-leave logic are present. Controller bodies are inline TypeScript objects, not validation DTOs, so role values and member IDs are not validated at the boundary. Invitation does not verify that the target workspace-member record belongs to the route's workspace before creating the project membership. Project-member changes have socket events and eviction, but no activity records.
+### Tasks - Functional but Missing Polish
 
-**Frontend — 4/10.** A list and invite dialog exist in project settings. The settings page itself is unreachable through the broken Project Hub path. Controls are not consistently hidden/disabled for project viewers and mutation feedback/error states are limited.
+**Overview.** This is the strongest domain: CRUD, pagination, filters, assignees, recurrence fields, quick add, list/detail-sheet UI, keyboard workflow, resources, and AI-summary trigger exist.
 
-**Integration — 3/10.** Query and mutation hooks are real but depend on the broken Project Hub workspace value. `useRealtimeSync` does not subscribe to or invalidate project-member event keys.
+**Backend - 7/10.** Shared Zod DTOs, persistence, pagination, text/status/priority/category/project/tag/assignee filters, project/workspace permissions, assignee rows, activity, and creation broadcasts are present. Marking a recurring task done clones a next occurrence. `TaskComment` is schema-only: there is no controller, service, DTO, or UI. Assignee IDs are not verified as active workspace/project users. Recurrence completion returns from its transaction before activity, embeddings, and broadcast logic; normal update/delete do not broadcast their declared Socket.IO events. Category has no CRUD. Completion has no dedicated timestamp.
 
-**Production Readiness:** **Partial**.
+**Frontend - 7/10.** List, loading/empty states, filters, create/delete dialogs, quick add, recurrence selector, assignee picker, responsive controls, sheet, URL resource paste, AI card, and keyboard shortcuts are present. The sheet receives a list item rather than fetching the detailed endpoint, so its returned comments/resources/summary are not dependable. `/tasks/:taskId` is explicitly a static shell. Mutation errors are not visibly surfaced and the UI exposes fewer filters than the API.
 
-**Verified missing functionality:** boundary DTO validation; target workspace-member ownership check; activity records; role-aware UI; realtime cache handling; working Project Hub routing.
+**Integration - 6/10.** API envelope handling, React Query lists, and optimistic mutations are real. The socket listener expects update/delete events that services do not emit. Palette project-task links point to a route that does not exist; the normal detail link reaches a shell.
 
-### Tasks — **Functional but Missing Polish**
+**Verified missing functionality:** comments; working deep-link detail; assignee membership validation; category management; full filter UI; recurrence side effects; task update/delete broadcasts; mutation error UX; valid project-task links.
 
-**Overview.** Tasks are the strongest domain: CRUD, pagination, filters, assignees, recurrence fields, quick add, list UI, detail sheet, keyboard navigation, resources, and AI summary trigger exist.
+### Habits - Partial
 
-**Backend — 7/10.** Controllers, shared Zod DTOs, Prisma data model, pagination, text/status/priority/category/project/tag/assignee filtering, project/workspace permissions, assignee persistence, activity records, and create broadcasts exist. Completing a recurring task clones an occurrence. Comments are schema-only: there is no comment service, controller, DTO, or UI. Assignee IDs are not verified as active workspace/project members. The recurring completion transaction returns before activity, embeddings, and broadcasts; normal update/delete also do not broadcast `task.updated`/`task.deleted`. There is no category CRUD. Task completion timestamps are inferred from `updatedAt` elsewhere rather than stored.
+**Overview.** Project-scoped habits offer create/edit/delete, same-day completion toggling, persisted counters/streak fields, activity, broadcasts, and simple cards.
 
-**Frontend — 7/10.** Dense list, loading/empty states, filters, create/delete dialogs, quick add, recurrence selector, assignee picker, responsive controls, task sheet, resource paste, AI summary card, and documented keyboard shortcuts are implemented. The detail sheet receives the list item, not a detail query, so comments/resources/AI summary returned by `findOne` are not reliably populated. The deep-link `/tasks/:taskId` is explicitly a placeholder. Forms have no surfaced mutation failure state and the filter UI exposes only search/status/priority despite broader backend filters.
+**Backend - 6/10.** Shared schemas, project-editor authorization, completions, counters, streak fields, activity, and broadcasts exist. RRule/timezone fields are stored and partially considered for streaks, but completion is allowed on any day regardless of recurrence. Day boundaries use server time rather than the habit timezone. Uncompletion decrements rather than recomputes historical streaks. Archived habits are not excluded or given a dedicated view.
 
-**Integration — 6/10.** React Query clients use the correct envelope and optimistic list mutations. Workspace slugs are accepted by the API. The realtime listener expects task update/delete events that services do not emit. Command Palette generates a nonexistent project task deep link (`/projects/:projectId/tasks/:taskId`) and normal task detail is only a shell.
+**Frontend - 5/10.** Create/edit dialogs, cards, loading/empty states, and responsive summary cards exist. The global page silently assigns a new habit to the first returned project; it has no project chooser, recurrence editor, history/statistics screen, or visible mutation error state.
 
-**Production Readiness:** **Functional but Missing Polish**.
+**Integration - 6/10.** Hooks and invalidations use real APIs. The service emits `habit.*`, but `useRealtimeSync` has no habit subscriptions. The Project Hub defect also prevents project-scoped management from working.
 
-**Verified missing functionality:** comments; usable deep-link detail; assignee membership validation; category management; complete filter UI; recurrence activity/embedding/realtime; task update/delete broadcasts; mutation feedback; valid project-task command links.
+**Verified missing functionality:** recurrence configuration/due enforcement; timezone-correct completion; historical streak recomputation; archive handling; project selector; history/statistics; error UX; habit realtime refresh.
 
-### Habits — **Partial**
+### Study Blocks - Functional but Missing Polish
 
-**Overview.** Project-scoped habits support create/edit/delete, same-day completion toggle, persisted counters, streak fields, and basic dashboard/stat cards.
+**Overview.** A user can run one active personal study block per workspace with a timer, project selection, completion/cancellation, completion notes, activity on start/complete, and a floating active widget.
 
-**Backend — 6/10.** CRUD uses shared Zod schemas and project-editor authorization. Completion records, streak/count fields, activity logs, and broadcasts are present. RRule/timezone fields are persisted and partially used in streak calculation, but a habit may be completed on any day regardless of recurrence. Dates use server-local day boundaries, not the habit timezone. Un-completing decrements current streak rather than recomputing the historical sequence. Archived habits are neither excluded nor separately exposed.
+**Backend - 6/10.** Create/active/update/complete/cancel endpoints use Zod schemas and persistence. Blocks are creator-private; creation checks project-viewer access; start/complete record activity and broadcast. Cancel/update have no activity record. There is no history endpoint, automatic completion at planned duration, or validation that task/habit references belong to the selected workspace/project.
 
-**Frontend — 5/10.** Create/edit dialogs, completion cards, loading, empty presentation, responsive summary cards, and project-scoped creation exist. The global page silently assigns a new habit to the first returned project; it has no project picker, history/statistics view, recurrence configuration, or error state. Dashboard cards are not a full habit management experience.
+**Frontend - 6/10.** Presets, selected project, timer, start/complete/cancel, disabled loading controls, responsive layout, and completion notes are implemented. A timer reaching zero does not complete the session. Pause, history, task/habit selection, active-note save, sound/notification, explanatory no-project state, and mutation errors are absent.
 
-**Integration — 6/10.** Hooks and envelope use are sound and mutations invalidate habit queries. Realtime emits `habit.*`, but the global listener has no habit subscriptions, so remote habit changes do not refresh the screen. Project route failure also blocks the project-scoped UI.
+**Integration - 5/10.** Active-session hooks use the real stored workspace ID and response envelope. Study broadcasts exist, but query invalidation does not precisely match active-session keys and may be sent only to project rooms. Dashboard refresh is incomplete.
 
-**Production Readiness:** **Partial**.
+**Verified missing functionality:** auto-completion/notification; history; pause and active-note persistence UI; task/habit ownership validation/pickers; cancel/update activity; reliable realtime/dashboard refresh; complete error/empty UX.
 
-**Verified missing functionality:** recurrence configuration/due enforcement; timezone-aware completion; historical streak recomputation; archive behavior; project selector; completion history/statistics; mutation/error UX; habit realtime invalidation.
+### Notes - Functional but Missing Polish
 
-### Study Blocks — **Functional but Missing Polish**
+**Overview.** Notes provide CRUD, Markdown edit/preview, pinning, project/task fields, local text search, activity, broadcasts, and embedding requests.
 
-**Overview.** Users can run one personal active study block per workspace with timer display, completion, cancellation, project linkage, notes on completion, activity on start/complete, and a floating active-session widget.
+**Backend - 6/10.** Controllers, shared validation, persistence, permissions, pinning, activity, broadcasts, and embeddings exist. The current model and creation validator require a project, so notes are not workspace-wide despite service branches for unassigned notes. There is no server text search, author, version/history, collaboration, or check that `taskId` belongs to the selected project/workspace. Moving a note broadcasts only to the original project room.
 
-**Backend — 6/10.** Create/active/update/complete/cancel endpoints use Zod schemas and persist study blocks. Blocks are restricted to their creator; create requires project viewer access; and start/complete events record activity and broadcasts. Cancel and update have no activity record. There is no history endpoint, no automatic completion at planned duration, and no validation that optional task/habit links belong to the selected workspace/project.
+**Frontend - 6/10.** Create/edit/delete dialogs, Markdown editing/preview, pins, responsive cards, local title/content search, loading, and empty states are real. Global creation silently uses the first project and offers no project/task picker or visible mutation error. Cards are clickable `div`s rather than keyboard-operable controls.
 
-**Frontend — 6/10.** Presets, selected project, timer, start/complete/cancel controls, loading disablement, responsive layout, and completion notes are implemented. The count-down stops at zero without completing the session. No pause, history, task/habit picker, active-note save, sound/notification, no-project explanation, or mutation failure UI exists.
+**Integration - 5/10.** React Query calls/mutations are implemented. Socket invalidation uses `['notes']`, while feature hooks use `['workspaces', workspaceId, 'notes']`; remote changes do not refresh those views.
 
-**Integration — 5/10.** Active session hooks use the real stored workspace ID and API envelope. Broadcasts exist, but the sync hook's `['study-blocks']` invalidation is too broad/incomplete relative to the active key and events can be project-room-only. The dashboard is not invalidated after every relevant study action.
+**Verified missing functionality:** server search; project/task selectors; task ownership validation; author/history; correct moved-note broadcast; matching realtime invalidation; accessible cards; mutation error UX.
 
-**Production Readiness:** **Functional but Missing Polish**.
+### Resources - Partial
 
-**Verified missing functionality:** auto-completion/notification; history; pause and active-note persistence UI; task/habit ownership validation and pickers; cancel/update activity; reliable realtime/dashboard cache refresh; error/empty UX.
+**Overview.** URL resources can be created, type-inferred, attached to tasks/projects, shown, opened, and deleted.
 
-### Notes — **Functional but Missing Polish**
+**Backend - 5/10.** CRUD, shared validation, URL type inference, persistence, permissions, activity, broadcasts, and embedding requests exist. Metadata is caller-supplied: no fetcher, preview renderer, OpenGraph extraction, title enrichment, or cache exists. Create/update do not verify that `taskId` belongs to the selected workspace/project. Resource lists do not separately validate task-scoped access.
 
-**Overview.** Notes provide CRUD, Markdown edit/preview, pinning, project and task fields, local text search, activity, broadcasts, and embedding requests.
+**Frontend - 4/10.** Fast URL paste/Enter add, task/project displays, loading/empty state on the project page, and deletion are implemented. There is no global library, update UI, filters, metadata editor, preview, error UI, or delete confirmation. `new URL(resource.url)` is called while rendering a card and can throw for malformed persisted URLs.
 
-**Backend — 6/10.** Controllers, Zod validation, persistence, permission checks, pinning, activity, broadcasts, and embedding calls are implemented. The schema and create validator require a project, so notes are not workspace-wide despite service branches for unassigned notes. There is no server text search, authorship, version/history, collaboration, or validation that `taskId` belongs to the specified project/workspace. Moving a note broadcasts only to the original project's room.
+**Integration - 5/10.** React Query list/create/delete and envelope use are real; resource invalidation prefix matches the hooks. Update is available in the client but has no hook/UI. No OpenGraph/preview integration exists.
 
-**Frontend — 6/10.** Create/edit/delete dialogs, Markdown edit/preview, pins, responsive cards, local title/content search, loading and empty states are present. Global note creation silently uses the first returned project and has no project/task selector or error state. Cards are clickable `div`s rather than keyboard-operable controls.
+**Verified missing functionality:** metadata/OpenGraph/preview pipeline; task/project ownership validation; update/filter/library UI; safe URL rendering; confirmation/error UX.
 
-**Integration — 5/10.** React Query consumes raw enveloped note arrays and mutations invalidate queries. The global listener invalidates `['notes']`, whereas note hooks use `['workspaces', workspaceId, 'notes']`; remote note changes therefore do not refresh those queries.
+### Dashboard - Partial
 
-**Production Readiness:** **Functional but Missing Polish**.
+**Overview.** A backend aggregate feeds score cards, task/habit sections, recent projects, recent activity, quick actions, and responsive chart containers.
 
-**Verified missing functionality:** server search; project/task selection; task ownership validation; author/version/history; correct moved-note broadcast; matching realtime invalidation; accessible cards; mutation/error feedback.
+**Backend - 5/10.** The service calculates personal assigned due/overdue tasks, study time, habits, projects, activity, and a score. Habits/recent projects lack direct project-membership filtering. Completed-task count uses `updatedAt`, so a later edit can make a historical task appear completed today. The score uses fixed baselines and no auditable historical period; no series is returned for charts.
 
-### Resources — **Partial**
+**Frontend - 7/10.** Loading/error, responsive cards, empty states, quick access, activity presentation, and task/habit cards are real. Command Palette holds quick actions. Recharts containers are responsive, but the chart component explicitly fabricates weekly distribution points from current aggregates.
 
-**Overview.** URL resources can be created, type-inferred, attached to a task/project, displayed, opened, and deleted.
+**Integration - 5/10.** Dashboard API, token, envelope, and slug resolution work. Some events invalidate the dashboard, but task updates/deletes are never emitted, habits are not subscribed, study invalidation is incomplete, and project links lead to the broken Project Hub.
 
-**Backend — 5/10.** CRUD, Zod validation, URL type inference, persistence, permissions, activity, broadcasts, and embedding requests exist. Metadata is caller-supplied; no URL fetch, preview rendering, OpenGraph extraction, title enrichment, or cache pipeline exists. Create/update do not verify that `taskId` belongs to the selected workspace/project. Resource rows have no owner/creator. Resource lists can expose task-filtered resources without validating access to that task separately.
+**Verified missing functionality:** project-membership-safe aggregation; historical chart data; dedicated task-completion time; reliable realtime invalidation; working project destinations.
 
-**Frontend — 4/10.** Fast URL paste/Enter add, project and task displays, loading/empty state on project view, and delete action are implemented. There is no global resource library, update UI, filters, metadata editor, preview, create/delete error display, or delete confirmation. `ResourceCard` calls `new URL(resource.url)` during render, which can crash the component for any persisted malformed value.
+### Activity Feed - Partial
 
-**Integration — 5/10.** React Query list/create/delete and API envelopes are implemented. The global resource cache prefix matches feature keys. No OpenGraph or preview integration exists, and update is exposed by the API client but has no hook/UI.
+**Overview.** Workspace/project activity APIs, a paginated workspace feed, and reusable activity components exist.
 
-**Production Readiness:** **Partial**.
+**Backend - 6/10.** Multiple domains write activities; workspace/project reads are cursor-paginated. Workspace reads filter private-project events by project membership. Activity writes are fire-and-forget and swallow errors, so audit completeness cannot be guaranteed. Study cancel/update and project-member mutations are not logged.
 
-**Verified missing functionality:** server metadata/OpenGraph/preview pipeline; task/project ownership validation; update/filter/library UI; safe malformed URL rendering; confirmation/error UX.
+**Frontend - 5/10.** The workspace page offers loading, empty, refresh, and load-more. Project Activity is a static empty-state shell and never calls the available project hook. It has no action filter.
 
-### Dashboard — **Partial**
+**Integration - 4/10.** Workspace activity handling is correct. Realtime invalidates `['activities']`, but hooks are keyed under `['workspaces', workspaceId, 'activity']`; live updates do not refresh the feed.
 
-**Overview.** The dashboard uses a real backend aggregation endpoint and presents score cards, task/habit sections, recent projects, activity, quick actions, and charts.
+**Verified missing functionality:** guaranteed audit writes; activity coverage for omitted mutations; rendered project feed; matching realtime invalidation; action filters.
 
-**Backend — 5/10.** The service aggregates personal assigned due/overdue tasks, study time, habits, recent projects, activity, and a score. It has no direct project-membership filtering for habits or recent projects, so it can return data from projects the requester cannot access. It counts completed tasks using `updatedAt`, so later edits to historical completed tasks can count as completed today. The score uses arbitrary fixed baselines rather than an auditable period model. No historical chart series is produced.
+### Calendar - Partial
 
-**Frontend — 7/10.** Dashboard loading, error, responsive cards, empty states, quick access, activity presentation, and task/habit cards are real. Quick actions live in Command Palette. Chart containers use Recharts responsively. The chart data is explicitly fabricated from the current aggregate values rather than returned history.
+**Overview.** The page is a client-side month grid with a selected-day task agenda, not the specified unified calendar.
 
-**Integration — 5/10.** Dashboard client uses the correct API prefix, token, and response envelope; slugs resolve at the server. Some realtime events invalidate `['dashboard']`, but task updates/deletes are not emitted, habits are not subscribed, and study refresh is incomplete. Dashboard project links lead into the broken Project Hub.
+**Backend - 0/10.** No calendar controller, service, range query, or aggregation endpoint exists.
 
-**Production Readiness:** **Partial**.
+**Frontend - 4/10.** Month navigation, task counts by due date, selected-day agenda, loading skeleton, and empty agenda are implemented. It loads the default task list only; it does not load a date range, habits, study blocks, or events. Agenda items do not open detail and there is no request-error state.
 
-**Verified missing functionality:** project-membership-safe aggregation; actual historical chart data; accurate task-completion time; reliable realtime invalidation; working project destinations.
+**Integration - 3/10.** It consumes `useTasks`, but there is no calendar-specific React Query/API contract or realtime invalidation.
 
-### Activity Feed — **Partial**
+**Verified missing functionality:** calendar API; date-range loading; habits/study/events; detail navigation; error state; realtime refresh.
 
-**Overview.** Workspace and project activity endpoints exist, with an infinite workspace feed UI and a reusable activity list.
+### Analytics - Scaffold Only
 
-**Backend — 6/10.** Activities are persisted by many domains and workspace/project reads are paginated by cursor. The workspace query filters private project events by project membership. Activity writes are fire-and-forget and silently swallow errors, so audit completeness is not guaranteed. Several important actions are not logged (for example study cancel/update and project membership changes).
+**Overview.** Analytics is a display layer over dashboard data, not a separate analytics implementation.
 
-**Frontend — 5/10.** Workspace activity page has loading, empty, refresh, and load-more behavior. The Project Activity tab is a static empty state and never calls the existing project activity hook. There are no filters in the page despite change-log claims.
+**Backend - 1/10.** No analytics module, endpoint, model, aggregation, historical query, cohort, or export exists.
 
-**Integration — 4/10.** Workspace activity hook consumes the envelope correctly. `useRealtimeSync` invalidates `['activities']`, but activity queries are keyed under `['workspaces', workspaceId, 'activity']`; live activity updates do not refresh them.
+**Frontend - 3/10.** The page has skeletons and consumes dashboard data, but supplies hard-coded fallback KPIs. `DashboardCharts` explicitly creates mock weekly points. Its formula labels conflict with the backend: it states Focus 40% / Habits 20%, while the service calculates Focus 20% / Habits 30%.
 
-**Production Readiness:** **Partial**.
-
-**Verified missing functionality:** reliable audit writes; activity coverage for omitted mutations; rendered project feed; working realtime invalidation; implemented action filters.
-
-### Calendar — **Partial implementation**
-
-**Overview.** A responsive month grid and selected-day task agenda exist. It is not the documented unified calendar feature.
-
-**Backend — 0/10.** There is no calendar controller, service, range query, or aggregator endpoint.
-
-**Frontend — 4/10.** The page renders month navigation, task counts by due date, selected-day agenda, loading skeleton, and empty agenda. It only loads the default task list, not a date-range query, habits, study blocks, or workspace events. It does not navigate to task details and has no request-error state.
-
-**Integration — 3/10.** It uses React Query through `useTasks`, but there is no calendar-specific integration or realtime invalidation.
-
-**Production Readiness:** **Partial**.
-
-**Verified missing functionality:** calendar API; date-range loading; habits/study blocks/events; detail navigation; error state; realtime refresh.
-
-### Analytics — **Scaffold Only**
-
-**Overview.** Analytics is a display layer over dashboard data, not an analytics implementation.
-
-**Backend — 1/10.** There is no analytics module, endpoint, data model, aggregation, historical query, cohort, or export.
-
-**Frontend — 3/10.** The page calls dashboard data and has loading skeletons, but supplies hard-coded fallback scores when no data is returned. `DashboardCharts` explicitly constructs `mockWeeklyData`, so the displayed weekly trend is not actual recorded history. Formula labels also conflict with the implemented dashboard formula: the page says Focus 40% / Habits 20%, while the backend uses Focus 20% / Habits 30%.
-
-**Integration — 2/10.** It reuses `useDashboard`; it has no dedicated React Query/API integration or realtime model.
-
-**Production Readiness:** **Scaffold Only**.
+**Integration - 2/10.** It reuses `useDashboard`; it has no dedicated API, query key, historical data model, or realtime model.
 
 **Verified missing functionality:** analytics backend; real historical data; accurate no-data behavior; formula consistency; date ranges, drilldowns, and export.
 
-### Achievements — **Scaffold Only**
+### Achievements - Missing Pieces
 
-**Overview.** The achievements route is a static mockup.
+**Overview.** There is no current Achievements route, page, navigation item, store, API, or feature module. The former unbacked presentation UI was removed.
 
-**Backend — 0/10.** `User` has `xp` and `level` fields, but no achievement/badge model, rules engine, activity consumer, API, background processing, or XP-award implementation exists.
+**Backend - 0/10.** `User.xp` and `User.level` remain inert schema fields. There is no achievement/badge persistence, rules engine, event consumer, API, background processing, or XP award logic.
 
-**Frontend — 2/10.** The page is responsive and visually complete, but its level, XP, dates, achievements, lock state, and progress are hard-coded constants. It has no loading, error, empty, or mutation state because it has no data source.
+**Frontend - 0/10.** No page, route, navigation entry, data view, loading/error/empty state, or accessible interaction exists.
 
-**Integration — 0/10.** No API, React Query, Zustand, socket, navigation action, or dashboard linkage exists beyond the static route.
+**Integration - 0/10.** No API, React Query, Zustand, Socket.IO, command palette, or dashboard linkage exists.
 
-**Production Readiness:** **Scaffold Only**.
+**Verified missing functionality:** the entire feature: data model, rules, XP updates, APIs, UI, realtime behavior, and tests.
 
-**Verified missing functionality:** every data-bearing part of achievements: persistence, rules, XP updates, APIs, live UI, and tests.
+### AI - Partial
 
-### AI — **Partial**
+**Overview.** OpenAI summarization, embeddings, pgvector storage, and semantic-search code exist; the user workflow and data isolation are incomplete.
 
-**Overview.** OpenAI summary, embedding generation, pgvector storage, and semantic search code are present; the end-user workflow is limited and permission filtering is incomplete.
+**Backend - 4/10.** `AiService` calls chat completions for summaries and `text-embedding-3-small` for embeddings. Tasks, notes, and resources request embeddings after changes; semantic search unions all three pgvector tables. The API checks workspace membership only. Raw semantic SQL neither filters project membership nor excludes deleted tasks, so it can return inaccessible/deleted project content. Search limit is parsed but not range-validated. Embedding errors are swallowed; absent provider config yields an internal error rather than a feature-disabled response.
 
-**Backend — 4/10.** `AiService` invokes chat completions for summaries and `text-embedding-3-small` for embeddings. Tasks, notes, and resources request embeddings after create/update; `semanticSearch` queries pgvector across all three tables. AI endpoints are guarded by workspace membership, but semantic search does not filter project membership or deleted tasks, so a workspace member can receive indexed content from inaccessible/deleted project records. Search limits are parsed but not range-validated. Embedding errors are swallowed; missing provider configuration fails an AI request rather than producing a feature-disabled response.
+**Frontend - 4/10.** Task-sheet summary generation and semantic results in the Command Palette are real. There is no standalone search UI, entity-specific navigation for notes/resources, persisted summary write-back, reindexing control, or AI-disabled experience.
 
-**Frontend — 4/10.** The task sheet exposes summary generation and Command Palette issues semantic queries after three characters with a loading indicator. There is no standalone search experience, no result detail navigation for notes/resources, no persisted summary write-back, and task detail links lead to a placeholder route.
+**Integration - 4/10.** Authenticated API clients and React Query hooks exist. Palette result paths are generic and task deep links are shells. There is no queue, retry state, reindexing, index monitoring, or permission-aware result contract.
 
-**Integration — 4/10.** Authenticated client and React Query hooks exist. Palette results use generic routes rather than entity-specific deep links. There is no queue, retry status, reindexing tool, index migration/monitoring, or permission-aware result contract.
+**Verified missing functionality:** project-permission/deleted-row filtering; entity deep links; persisted summaries; disabled-provider UX; reindex/retry/observability; validated limits.
 
-**Production Readiness:** **Partial**.
+### Search - Partial
 
-**Verified missing functionality:** project-permission/deleted-row filtering; entity deep links; persisted summaries; AI-disabled UX; reindex/retry/observability; validated search limits.
+**Overview.** Cmd/Ctrl+K Command Palette, local recent items, cached client search, quick navigation actions, and optional semantic results are implemented. There is no actual global text search.
 
-### Search — **Partial**
+**Backend - 1/10.** No textual global-search endpoint exists. Semantic search is a separate API and has the access-control gap described above.
 
-**Overview.** Cmd/Ctrl+K Command Palette and client-side cache search are implemented; global server search is not.
+**Frontend - 5/10.** The accessible `cmdk` palette supports keyboard trigger, recent items in localStorage, quick actions, cached projects/tasks/habits/notes/resources/members, semantic loading, and an empty state. It can only search already-loaded cache data. Project-task paths are invalid; note/resource results lead to broad collection pages rather than a focused entity.
 
-**Backend — 1/10.** There is no textual global-search endpoint. AI semantic search is separate and has the authorization gap described above.
+**Integration - 4/10.** Most cache keys are read correctly and semantic search is called. Unloaded records cannot be discovered, and Project Hub routing prevents useful project results.
 
-**Frontend — 5/10.** The palette is keyboard-triggered, accessible through `cmdk`, has recent items in localStorage, quick navigation actions, client-side search for cached projects/tasks/habits/notes/resources/members, semantic-result loading, and an empty state. It only searches data previously loaded into React Query. It creates invalid project-task paths; note/resource results navigate to broad collection pages rather than items.
+**Verified missing functionality:** server global text search; secure semantic search; entity deep links; cache-independent results; working Project Hub paths.
 
-**Integration — 4/10.** It reads cache keys correctly for most list hooks and calls semantic search. It cannot discover unloaded records, and the broken Project Hub prevents project results from being useful.
+### Notifications - Missing Pieces
 
-**Production Readiness:** **Partial**.
+**Overview.** The former unbacked bell, overlay, and Zustand store were removed. User preferences retain a `notificationsEnabled` field, but no notification feature exists.
 
-**Verified missing functionality:** server global text search; secure semantic search; reliable entity deep links; cache-independent results; fixed Project Hub paths.
+**Backend - 0/10.** No schema, service, delivery, preferences API, endpoint, or socket notification event exists.
 
-### Notifications — **Scaffold Only**
+**Frontend - 0/10.** No bell, panel, route, settings controls, states, or accessible notification interaction exists.
 
-**Overview.** A bell component and an in-memory Zustand store exist.
+**Integration - 0/10.** No API, React Query, store, socket, or activity-to-notification integration exists.
 
-**Backend — 0/10.** No notification schema, service, delivery, preferences, endpoints, or realtime notification events exist.
+**Verified missing functionality:** notification center, persistence, preferences workflow, realtime delivery, email/push/browser channels, and tests.
 
-**Frontend — 1/10.** The bell can receive a count/callback, but no panel is wired. The Zustand items are initialized empty and no source populates them.
+### Settings - Functional but Missing Polish
 
-**Integration — 0/10.** No API or socket integration.
+**Overview.** User profile/timezone/theme plus workspace metadata and member settings are implemented through real APIs.
 
-**Production Readiness:** **Scaffold Only**.
+**Backend - 6/10.** `/users/me` GET/PATCH and workspace PATCH are authenticated, validated, and tested. Workspace update requires owner/admin. There is no billing, account deletion UX/API, password/security management, notification preferences API, or standalone workspace-settings JSON API.
 
-**Verified missing functionality:** notification system end-to-end.
+**Frontend - 6/10.** Profile load/save/error, theme selection, a timezone selector, metadata form, and member management are present. Timezone choices are a short fixed list; shell identity is static; workspace settings require an existing workspace and cannot start creation.
 
-### Settings — **Functional but Missing Polish**
+**Integration - 7/10.** User/workspace mutations use actual API calls, shared validation, and response handling; theme is Zustand-backed. No profile realtime or Clerk-profile reconciliation beyond local data exists.
 
-**Overview.** User profile/timezone/theme and workspace metadata/member settings are implemented separately.
-
-**Backend — 6/10.** `/users/me` GET/PATCH and workspace PATCH are authenticated, validated, and tested. Workspace update is owner/admin constrained. There is no billing, notification preferences, account deletion UI/API, password/security management, or workspace settings JSON API.
-
-**Frontend — 6/10.** Profile loading/save/error state, theme choice, timezone selector, workspace metadata form, and member management exist. Timezone is a short fixed list, not an exhaustive selector. The shell identity is static. Workspace settings are only reachable after a workspace has already been created elsewhere.
-
-**Integration — 7/10.** Profile and workspace mutations use real API calls, shared validation, and correct response handling. Theme uses Zustand. No user/profile realtime or Clerk profile synchronization beyond local database storage.
-
-**Production Readiness:** **Functional but Missing Polish**.
-
-**Verified missing functionality:** complete timezone choices; notification/account/security/billing settings; dynamic shell identity; workspace creation entry point.
+**Verified missing functionality:** complete timezone choices; notification/account/security/billing settings; dynamic identity; workspace creation entry point.
 
 ## Cross-cutting systems
 
-| System          | Score | Verified state                                                                                                                                                                                                                                                                 |
-| --------------- | ----: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| React Query     |  6/10 | Well-established domain hooks, pagination and several optimistic mutations. Query-key inconsistencies prevent activity/note/study realtime refresh; no centralized API error mapping.                                                                                          |
-| Zustand         |  5/10 | Used appropriately for UI/theme/workspace/session-like state. Notification and presence stores are unconnected; duplicated URL/store workspace state can drift.                                                                                                                |
-| Socket.IO       |  4/10 | Authenticated rooms and eviction are implemented/tested. Provider reconnect lifecycle is unstable, event emission/subscription coverage is incomplete, and cache keys mismatch.                                                                                                |
-| Prisma/database |  6/10 | Sensible core schema, pgvector extension, activity indexes, migrations, and soft deletion for user/workspace/task/project. Missing constraints/validations for cross-entity task/resource/note links; several lifecycle tables/features absent.                                |
-| Shared package  |  7/10 | Shared types, validators, constants, response envelope, and tests exist. Project-members use inline unshared input types; several domain semantics are not represented in shared contracts.                                                                                    |
-| Docker          |  5/10 | Database/Redis compose and API/web Dockerfiles exist. Compose does not orchestrate API/web services, production secrets/deployment configuration is not supplied, and no health checks exist for application containers.                                                       |
-| CI/CD           |  6/10 | CI installs locked dependencies, builds, lint/typechecks/formats, starts pgvector/Redis, migrates, and runs unit/E2E tests. No deployment pipeline, environment promotion, artifact/image publishing, security/dependency scanning, or migration rollback strategy is present. |
-| Documentation   |  2/10 | Broad coverage exists but the current state, roadmap, change log, and feature docs conflict materially with the source.                                                                                                                                                        |
+| System          | Score | Verified state                                                                                                                                                                                                                                                               |
+| --------------- | ----: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| React Query     |  6/10 | Established domain hooks, pagination, and some optimistic mutations. Realtime invalidation keys mismatch activity/note/study queries; no central API-error mapping.                                                                                                          |
+| Zustand         |  5/10 | Appropriate UI/theme/workspace/session-like use. URL and store workspace state can drift; presence is unconnected. The old notification store was removed.                                                                                                                   |
+| Socket.IO       |  4/10 | Authenticated workspace/project rooms and eviction are implemented/tested. Provider lifecycle is unstable; emission/subscription coverage is incomplete; cache keys mismatch. Mid-session JWT expiry is accepted and sockets are single-instance only.                       |
+| Prisma/database |  6/10 | Core models, pgvector extension, indexes, migrations, and soft deletion exist. Cross-entity link validation/constraints are incomplete; `Project.creatorId` has no User relation; several lifecycle models are absent.                                                       |
+| Shared package  |  7/10 | Shared types, validators, constants, response envelope, and tests exist. Project-member bodies are inline/unshared and some domain semantics are absent from contracts.                                                                                                      |
+| Docker          |  7/10 | Production compose orchestrates PostgreSQL, Redis, API, and web; API/web images have health checks; API entrypoint deploys migrations. It is a single-VM/single-instance design, host ports expose internal services, and production secret/backup operations remain manual. |
+| CI/CD           |  6/10 | CI uses locked installs, build/lint/typecheck/format checks, pgvector/Redis, migrations, unit/E2E tests, and container builds. There is no deployment, artifact publishing, environment promotion, security/dependency scan, or automated rollback.                          |
+| Documentation   |  3/10 | Current State/Roadmap acknowledge the audit, but many feature specifications and legacy handoff/audit files still make contradicted implementation claims.                                                                                                                   |
 
-## Documentation accuracy discrepancies
+## Documentation accuracy
 
-The following are direct source-to-documentation discrepancies, not roadmap opinions.
+### Current State and Roadmap
 
-1. `09_CURRENT_STATE.md` says all platform routes are “complete and operational,” but Projects/Project Hub have the verified `workspaceId`/`workspaceSlug` routing defect; project settings/activity are scaffolded; analytics/achievements are not operational data features; and ProtectedLayout does not protect routes.
-2. `09_CURRENT_STATE.md` simultaneously lists habits, notes, and study as completed and lists Habit, Note, and StudyBlock schema/API/frontend work as “Not Started.” The schema and modules currently exist.
-3. `13_ROADMAP.md` says Project Domain is the “Next Major Hub,” Habits/Notes are future feature work, real-time is future, and gamification/analytics are future. Source includes all of those partial implementations. It also duplicates “Milestone 5.”
-4. `14_CHANGELOG.md` calls the platform completion complete and describes an “integrated live” activity feed, “complete” analytics, and completed achievements. Project activity is static; analytics contains hard-coded fallback and mock chart data; achievements are static; activity realtime invalidation does not match the query key.
-5. `docs/features/tasks.md` says the task frontend is complete and its known limitation is no recurrence. Recurrence fields/UI/clone logic now exist, while comments, deep-link detail, complete filter UI, and update/delete realtime are missing.
-6. `docs/features/notes.md` calls Notes completed and declares an `authorId` field. The Prisma `Note` model has no author field; server search, history, ownership validation, and robust realtime behavior are absent.
-7. `docs/features/resources.md` says resources currently only appear on Tasks. They also appear in project pages. Its “no deep OpenGraph scraping” limitation is accurate.
-8. `docs/features/activity.md` says WebSockets are deferred. Activity broadcast exists, but its frontend invalidation is broken. The documented `Activity` unions omit implemented HABIT/STUDY_BLOCK and UNCOMPLETED action usage.
-9. `docs/features/calendar.md`, `habits.md`, `study.md`, and `achievements.md` say Not Started, although calendar/habits/study have partial source implementations and achievements has a static presentation route. Their listed models/endpoints/components do not match the actual shapes.
-10. `docs/features/analytics.md` presents weekly charts as data-backed. `dashboard-charts.tsx` explicitly builds mock weekly data. It also does not acknowledge that Analytics lacks an API/module.
-11. `docs/features/search.md` says V1 covers projects/tasks/notes/resources and not command executions. Source additionally searches cached habits/members and implements navigation quick actions; it does not provide actual server search.
-12. `docs/features/settings.md` says the workspace API is `/api/workspaces/:workspaceId` and invites use `/invites`. Actual endpoints are `/api/v1/workspaces/:workspaceId` and `/members`; user profile and workspace metadata forms are already wired, contradicting the unchecked implementation checklist.
-13. `docs/features/projects.md` correctly marks project activity as planned and settings as a next step, conflicting with `CURRENT_STATE`/`CHANGELOG` completion claims. It does not document the current route-param failure.
+`09_CURRENT_STATE.md` and `13_ROADMAP.md` now broadly agree with the source: they identify the Project Hub parameter defect, missing route protection, incomplete realtime, dashboard/AI permission gaps, mock analytics, and removed Achievements/Notifications. They should be treated as summaries, not proof of implementation.
+
+### Changelog discrepancies
+
+`14_CHANGELOG.md` opens with a correction saying its older completion claims are superseded by this audit. That correction matches the source. The legacy entries below remain internally contradictory and should not be left as apparent release facts:
+
+1. It calls Habits, Notes, Study, Calendar, Analytics, and Achievements "complete" even though the source has the gaps recorded above; Achievements is now removed entirely.
+2. It describes Analytics charts as productivity metrics, but the chart component fabricates weekly points and no analytics backend exists.
+3. It describes Project Hub polish as completed, but the route-parameter defect prevents it working and Project Activity/Settings actions are shells.
+4. It says activity is broadcast/live; broadcast exists, but React Query invalidation does not match the activity query key.
+
+### Feature-spec and legacy-document discrepancies
+
+1. `features/achievements.md` says a static achievements route exists. Source and its regression test show that route, navigation, and fake UI were removed.
+2. `features/activity.md` says activity WebSockets are both implemented in its status line and deferred in its body. Activity broadcasts are implemented; client live refresh is broken. Its declared activity unions omit implemented Habit/Study Block and uncompletion usage.
+3. `features/dashboard.md` promises automatic relevant-event refresh. Task update/delete events are not emitted, habits are not subscribed, study refresh is incomplete, and the charts are mock data.
+4. `features/habits.md` documents obsolete model, endpoint, and component names and leaves its implementation checklist unchecked although a partial implementation exists.
+5. `features/notes.md` has a correct current-status callout but a contradictory later "Completed" claim; it declares `authorId`, which the Prisma Note model does not have.
+6. `features/projects.md` correctly flags the route defect, but describes Settings as configuration/deletion although its actions are disabled and does not state project creation is absent.
+7. `features/resources.md` says resources appear only on Tasks; a project resource page exists. It correctly states that OpenGraph scraping is absent.
+8. `features/search.md` says Habits are future search work and command executions are absent; source searches cached habits and implements quick navigation actions. It correctly states search is client-cache-only.
+9. `features/settings.md` has an accurate status callout but unchecked checkboxes for forms, RBAC UI, and API wiring that source implements.
+10. `features/study.md` describes a shared synchronized timer, participant model, and timer socket API that do not exist. The status callout correctly describes a personal partial implementation.
+11. `features/tasks.md` has a correct status callout but a conflicting "complete" claim and says recurrence is absent. Recurrence fields/UI/clone logic exist; comments, real deep links, full filters, and update/delete realtime are missing. It also names a `TaskResource` model that is not in the Prisma schema.
+12. `features/workspaces.md` describes invitations at a high level but omits the verified absence of delivery, acceptance, expiry, revocation, and pending-user linking.
+13. `00_PROJECT_OVERVIEW.md`, `AI_HANDOFF.md`, `implementation_plan.md`, and `REPOSITORY_AUDIT.md` are historical/forward-looking documents that still describe Milestone 1-only state, removed notification/achievement files, or completed full platform routes. They do not match the current tree.
+
+`01_PRODUCT_SPEC.md` is a product target, not a claim of implemented behavior; its listed calendar, gamification, and realtime capabilities remain planned rather than verified delivered functionality.
 
 ## Technical debt
 
 ### 🔴 Critical
 
-- Project listing and every Project Hub tab use an undefined `workspaceId` route parameter and fall back to `home`.
-- `ProtectedLayout` does not enforce authentication or provide unauthenticated state handling.
-- Semantic search is restricted only by workspace membership, not project membership, and does not exclude soft-deleted tasks.
-- Realtime provider depends on `socket` in the socket-creation effect; changing socket state causes disconnect/recreation rather than a stable connection.
+- Project list and all Project Hub tabs use an undefined `workspaceId` parameter and fall back to `home`.
+- `ProtectedLayout` does not enforce authentication or provide signed-out/unauthorized handling.
+- Semantic search does not enforce project membership or exclude soft-deleted tasks.
+- Realtime provider depends on its own `socket` state in its connection-creation effect, causing disconnect/recreation.
 
 ### 🟠 High
 
-- Task update/delete events are not emitted; habit events are not subscribed; and activity/note/study invalidation keys do not match their queries.
-- Dashboard returns habits/recent projects without project-membership filtering.
-- Project `WORKSPACE` visibility semantics are not implemented; lists require a ProjectMember record.
-- Analytics presents mock/fallback values as metrics; achievements presents hard-coded user progress as product state.
-- Pending workspace invitations have no delivery, accept, expiry, revoke, or user-linking flow.
-- No operationally complete production deployment path exists (app orchestration, secret management, artifact deployment, rollback).
+- Task update/delete events are not emitted; habit events are not subscribed; activity/note/study invalidation keys do not match their hooks.
+- Dashboard exposes habits/recent projects without project-membership filtering.
+- `WORKSPACE` project visibility is not implemented; project lists require membership.
+- Analytics presents mock/fallback values as metrics.
+- Pending invitations have no delivery, acceptance, expiry, revoke, or user-linking path.
+- No multi-instance Socket.IO adapter, observability service, deployment pipeline, or automated release rollback exists.
 
 ### 🟡 Medium
 
-- Task comments and category management are schema-only/absent.
-- Notes/resources/study blocks do not fully validate linked entity ownership.
-- Habit recurrence/date handling is not timezone-correct and streak rollback is not historically recomputed.
-- Dashboard counts completion using `Task.updatedAt`; task completion has no dedicated timestamp.
-- Resource cards can throw on malformed persisted URLs.
-- Project-member mutations use unvalidated inline bodies and lack activity logging.
-- Activity logging intentionally swallows failures, leaving audit completeness unverifiable.
-- Project settings and project activity are visible scaffolds rather than completed flows.
+- Comments/category management are absent despite task schema support for comments.
+- Notes/resources/study blocks do not comprehensively validate linked-entity ownership.
+- Habit recurrence/timezone handling and streak rollback are not correct for history.
+- Dashboard uses `Task.updatedAt` as completion time.
+- Resource cards can throw for malformed stored URLs.
+- Project-member mutation bodies lack DTO validation/activity records.
+- Activity logging swallows failures.
+- Project settings/activity and task deep-link detail are visible shells.
 
 ### 🟢 Low
 
-- Static top-bar user identity and a small fixed timezone list reduce polish.
-- `docker-compose.dev.yml` uses an insecure default pgAdmin credential suitable only for local development.
-- Several docs have stale status, duplicated milestones, and encoding artifacts.
-- Web test coverage is narrow relative to the route and feature surface.
+- Static shell identity and limited timezone list reduce polish.
+- Production compose exposes database/Redis host ports; local development has an insecure pgAdmin default credential.
+- Legacy documents contain stale claims and some encoding artifacts.
+- Web test coverage is narrow for the route/feature surface.
 
 ## Overall scores
 
@@ -383,59 +355,56 @@ The following are direct source-to-documentation discrepancies, not roadmap opin
 | Accessibility                    |               5/10 |
 | Maintainability                  |               5/10 |
 | Scalability                      |               4/10 |
-| Documentation                    |               2/10 |
+| Documentation                    |               3/10 |
 | Testing                          |               6/10 |
-| Deployment Readiness             |               4/10 |
-| **Overall Production Readiness** | **4/10 — Partial** |
+| Deployment Readiness             |               5/10 |
+| **Overall Production Readiness** | **4/10 - Partial** |
 
 ## Final summary
 
 ### Actually complete features
 
-- Shared request validation/response envelope foundation.
-- Clerk token verification, JIT provisioning, and signed webhook user lifecycle handling.
-- Workspace list and metadata update flow.
-- User profile/timezone update flow.
-- Basic workspace member CRUD with server-side role enforcement.
-- Core task CRUD/list/filter flow for the non-deep-link workspace task view.
+- Shared validation/response-envelope foundation.
+- Clerk token verification, JIT provisioning, signed webhook lifecycle, and production-safe dev-bypass guardrail.
+- Workspace listing/metadata updates and user profile/theme/timezone updates.
+- Basic workspace-member CRUD with server-side role checks.
+- Non-deep-link task CRUD/list/filter workflow.
+- Single-VM container build/run path with migration entrypoint and health checks.
 
 ### Partially complete features
 
-- Projects and project permissions.
-- Tasks: recurrence, assignees, resources, and keyboard workflow exist, but comments/detail/realtime are incomplete.
-- Habits, Notes, Resources, Study Blocks, Dashboard, Activity Feed, Calendar, AI, Search, and Settings.
-- React Query, Zustand, Socket.IO, Prisma, Docker, CI.
+- Workspaces, Members, Projects, Project Permissions, Tasks, Habits, Study Blocks, Notes, Resources, Dashboard, Activity Feed, Calendar, AI, Search, and Settings.
+- React Query, Zustand, Socket.IO, Prisma, Docker, and CI.
 
 ### Placeholder features
 
-- Achievements.
-- Notifications.
-- Analytics as a data product (the UI exists, but backend and charts are not real analytics).
 - Task deep-link detail route.
-- Project Activity tab and project settings save/archive/delete controls.
+- Project Activity tab.
+- Project Settings save/archive/delete actions.
+- Analytics as a data product (the page exists but its metrics are not real analytics).
 
-### Features that need polish after blockers are resolved
+### Features that need polish
 
 - Member invitation lifecycle and role-aware UI.
-- Task comments/categories, detail page, full filters, recurrence UX, and mutation feedback.
-- Habit recurrence/timezone/stats/history.
-- Study auto-completion/history/pause and better empty/error states.
-- Note/resource editing, preview/metadata, safe links, and entity selectors.
-- Full timezone selection, dynamic identity, notifications, and accessibility refinements.
+- Task comments/categories, detailed deep links, full filters, recurrence side effects, and mutation errors.
+- Habit recurrence/timezone/history/statistics.
+- Study auto-completion/history/pause and error/empty states.
+- Note/resource selectors, metadata/previews, safe links, and accessible presentation.
+- Dynamic identity, broad timezone selection, and access-state UX.
 
 ### Features that should be built next
 
-1. Repair Project Hub route parameter use and finish project settings/activity; this restores an existing central product flow.
-2. Stabilize realtime lifecycle, emit/consume the declared domain events, and align cache keys.
-3. Close permission/data-scope gaps in dashboard and AI search.
-4. Complete task comments/deep links and invitation lifecycle.
-5. Replace mock analytics with permission-safe historical backend data.
+1. Repair Project Hub `workspaceSlug` integration, then complete project creation/settings/activity.
+2. Stabilize Socket.IO lifecycle, emit/consume declared events, and align cache keys.
+3. Close project-scope authorization in dashboard and AI search.
+4. Complete task comments/deep links and the workspace-invitation lifecycle.
+5. Replace analytics mock data with permission-safe historical backend aggregation.
 
 ### Features that should not be built yet
 
-- Gamification/achievements expansion.
-- Push/email notifications.
-- Additional AI features or embeddings UX.
+- Achievements/gamification expansion.
+- Notification delivery channels.
+- Additional AI surfaces or embeddings UX.
 - Calendar integrations and advanced analytics.
 
-Those features should wait until route correctness, authorization boundaries, realtime consistency, and current documentation are addressed.
+Those should wait until routing, authentication UX, authorization boundaries, and realtime consistency are repaired.
