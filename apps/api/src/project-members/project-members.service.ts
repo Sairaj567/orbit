@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectPermissionsService } from '../project-permissions/project-permissions.service';
 import { RealtimeService } from '../realtime/realtime.service';
+import { ActivityService } from '../activity/activity.service';
 import { ProjectRole } from '@prisma/client';
 
 @Injectable()
@@ -10,6 +11,7 @@ export class ProjectMembersService {
     private readonly prisma: PrismaService,
     private readonly permissionsService: ProjectPermissionsService,
     private readonly realtimeService: RealtimeService,
+    private readonly activityService: ActivityService,
   ) {}
 
   async findAll(workspaceId: string, projectId: string, userId: string) {
@@ -37,6 +39,19 @@ export class ProjectMembersService {
   ) {
     await this.permissionsService.requireProjectRole(workspaceId, projectId, userId, 'OWNER');
 
+    const targetWorkspaceMember = await this.prisma.workspaceMember.findFirst({
+      where: {
+        id: targetWorkspaceMemberId,
+        workspaceId,
+        status: 'ACTIVE',
+      },
+      include: { user: true },
+    });
+
+    if (!targetWorkspaceMember) {
+      throw new NotFoundException('User is not an active member of this workspace');
+    }
+
     const existing = await this.prisma.projectMember.findUnique({
       where: {
         projectId_workspaceMemberId: {
@@ -63,6 +78,20 @@ export class ProjectMembersService {
       },
     });
 
+    this.activityService.recordActivity({
+      workspaceId,
+      projectId,
+      userId,
+      entityType: 'PROJECT_MEMBER',
+      entityId: member.id,
+      action: 'INVITED',
+      metadata: {
+        role,
+        targetUserId: targetWorkspaceMember.userId,
+        targetName: targetWorkspaceMember.user?.displayName,
+      },
+    });
+
     this.realtimeService.broadcast({
       workspaceId,
       projectId,
@@ -85,6 +114,9 @@ export class ProjectMembersService {
 
     const member = await this.prisma.projectMember.findFirst({
       where: { id: memberId, projectId },
+      include: {
+        workspaceMember: { include: { user: true } },
+      },
     });
 
     if (!member) throw new NotFoundException();
@@ -109,6 +141,21 @@ export class ProjectMembersService {
       },
     });
 
+    this.activityService.recordActivity({
+      workspaceId,
+      projectId,
+      userId,
+      entityType: 'PROJECT_MEMBER',
+      entityId: updated.id,
+      action: 'ROLE_UPDATED',
+      metadata: {
+        oldRole: member.role,
+        newRole: role,
+        targetUserId: member.workspaceMember.userId,
+        targetName: member.workspaceMember.user?.displayName,
+      },
+    });
+
     this.realtimeService.broadcast({
       workspaceId,
       projectId,
@@ -130,13 +177,13 @@ export class ProjectMembersService {
 
     const member = await this.prisma.projectMember.findFirst({
       where: { id: memberId, projectId },
-      include: { workspaceMember: { select: { userId: true } } },
+      include: { workspaceMember: { include: { user: true } } },
     });
 
     if (!member) throw new NotFoundException();
 
     // A user can remove themselves (leave), or an OWNER can remove them
-    if (actor.id !== member.id && actor.role !== 'OWNER') {
+    if (!actor || (actor.id !== member.id && actor.role !== 'OWNER')) {
       await this.permissionsService.requireProjectRole(workspaceId, projectId, userId, 'OWNER'); // Force exception
     }
 
@@ -156,6 +203,19 @@ export class ProjectMembersService {
     if (member.workspaceMember?.userId) {
       this.realtimeService.evictProjectUser(projectId, member.workspaceMember.userId);
     }
+
+    this.activityService.recordActivity({
+      workspaceId,
+      projectId,
+      userId,
+      entityType: 'PROJECT_MEMBER',
+      entityId: member.id,
+      action: 'REMOVED',
+      metadata: {
+        targetUserId: member.workspaceMember.userId,
+        targetName: member.workspaceMember.user?.displayName,
+      },
+    });
 
     this.realtimeService.broadcast({
       workspaceId,

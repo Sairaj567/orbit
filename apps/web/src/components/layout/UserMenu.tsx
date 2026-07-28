@@ -2,9 +2,15 @@ import { LogOut, Settings2, User } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import type { WorkspaceRole } from '@orbit/shared';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { getWorkspacePath } from '@/lib/routes';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/auth-hooks';
 
 interface UserMenuProps {
   name: string;
@@ -15,6 +21,7 @@ interface UserMenuProps {
 
 export function UserMenu({ name, role, email, workspaceSlug }: UserMenuProps) {
   const [open, setOpen] = useState(false);
+  const { logout } = useAuth();
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -29,7 +36,9 @@ export function UserMenu({ name, role, email, workspaceSlug }: UserMenuProps) {
           </span>
           <span className="hidden min-w-0 flex-col sm:flex">
             <span className="truncate text-sm font-medium text-foreground">{name}</span>
-            <span className="truncate text-xs text-muted-foreground">{role} · {email}</span>
+            <span className="truncate text-xs text-muted-foreground">
+              {role} · {email}
+            </span>
           </span>
         </button>
       </DropdownMenuTrigger>
@@ -40,19 +49,29 @@ export function UserMenu({ name, role, email, workspaceSlug }: UserMenuProps) {
         </div>
         <div className="my-1 h-px bg-border/70" />
         <DropdownMenuItem onSelect={() => undefined}>
-          <Link to={getWorkspacePath(workspaceSlug, 'settings')} className="flex w-full items-center gap-3">
+          <Link
+            to={getWorkspacePath(workspaceSlug, 'settings')}
+            className="flex w-full items-center gap-3"
+          >
             <User className="h-4 w-4" aria-hidden="true" />
             Profile
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => undefined}>
-          <Link to={getWorkspacePath(workspaceSlug, 'settings')} className="flex w-full items-center gap-3">
+          <Link
+            to={getWorkspacePath(workspaceSlug, 'settings')}
+            className="flex w-full items-center gap-3"
+          >
             <Settings2 className="h-4 w-4" aria-hidden="true" />
             Settings
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => undefined}>
-          <button type="button" className={cn('flex w-full items-center gap-3 text-destructive')}>
+          <button
+            type="button"
+            onClick={() => logout()}
+            className={cn('flex w-full items-center gap-3 text-destructive')}
+          >
             <LogOut className="h-4 w-4" aria-hidden="true" />
             Sign out
           </button>

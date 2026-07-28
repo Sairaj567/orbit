@@ -6,6 +6,9 @@ import { ProtectedLayout } from '@/components/layout/protected-layout';
 import { DEFAULT_WORKSPACE_SLUG, getWorkspaceDashboardPath } from '@/lib/routes';
 import { DashboardPage } from '@/pages/dashboard';
 import { NotFoundPage } from '@/pages/not-found';
+import { LoginPage } from '@/pages/auth/login';
+import { RegisterPage } from '@/pages/auth/register';
+import { InvitePage } from '@/pages/invite';
 
 // Route-level code splitting
 const ProjectsPage = lazy(() =>
@@ -66,6 +69,16 @@ export function AppRouter() {
         <Route
           path="/"
           element={<Navigate to={getWorkspaceDashboardPath(DEFAULT_WORKSPACE_SLUG)} replace />}
+        />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route
+          path="/invite/:token"
+          element={
+            <ProtectedLayout>
+              <InvitePage />
+            </ProtectedLayout>
+          }
         />
         <Route
           path="/w/:workspaceSlug/*"

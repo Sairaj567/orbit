@@ -54,9 +54,8 @@ async function main() {
   const now = new Date();
 
   const saira = await prisma.user.upsert({
-    where: { clerkId: 'user_demo_saira_clerk' },
+    where: { email: 'saira@example.com' },
     update: {
-      email: 'saira@example.com',
       displayName: 'Saira',
       timezone: 'Asia/Calcutta',
       preferences: {
@@ -70,8 +69,8 @@ async function main() {
     },
     create: {
       id: ids.saira,
-      clerkId: 'user_demo_saira_clerk',
       email: 'saira@example.com',
+      passwordHash: 'seeded_dummy_hash',
       displayName: 'Saira',
       timezone: 'Asia/Calcutta',
       preferences: {
@@ -86,9 +85,8 @@ async function main() {
   });
 
   const partner = await prisma.user.upsert({
-    where: { clerkId: 'user_demo_partner_clerk' },
+    where: { email: 'partner@example.com' },
     update: {
-      email: 'partner@example.com',
       displayName: 'Partner',
       timezone: 'Asia/Calcutta',
       preferences: {
@@ -102,8 +100,8 @@ async function main() {
     },
     create: {
       id: ids.partner,
-      clerkId: 'user_demo_partner_clerk',
       email: 'partner@example.com',
+      passwordHash: 'seeded_dummy_hash',
       displayName: 'Partner',
       timezone: 'Asia/Calcutta',
       preferences: {

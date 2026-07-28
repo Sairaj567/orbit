@@ -1,83 +1,89 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@/lib/auth-hooks';
 import { NotesClient } from '../api/notes.client';
 import type { CreateNoteInput, UpdateNoteInput, NoteQueryInput } from '@orbit/shared';
+import { queryKeys } from '@/lib/query-keys';
+import { useRealtime } from '@/providers/realtime-provider';
+import { useEffect } from 'react';
 
 export function useNotes(workspaceId: string, query?: NoteQueryInput) {
-  const { getToken } = useAuth();
+  const { subscribe } = useRealtime();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const unsubCreated = subscribe('note.created', () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.notes.all(workspaceId) });
+    });
+    const unsubUpdated = subscribe('note.updated', () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.notes.all(workspaceId) });
+    });
+    const unsubDeleted = subscribe('note.deleted', () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.notes.all(workspaceId) });
+    });
+
+    return () => {
+      unsubCreated();
+      unsubUpdated();
+      unsubDeleted();
+    };
+  }, [workspaceId, subscribe, queryClient]);
 
   return useQuery({
-    queryKey: ['workspaces', workspaceId, 'notes', query],
+    queryKey: queryKeys.notes.list(workspaceId, query),
     queryFn: async () => {
-      const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
-      return NotesClient.findAll(workspaceId, query, token);
+      return NotesClient.findAll(workspaceId, query);
     },
     enabled: !!workspaceId,
   });
 }
 
 export function useNote(workspaceId: string, noteId: string) {
-  const { getToken } = useAuth();
-
   return useQuery({
-    queryKey: ['workspaces', workspaceId, 'notes', noteId],
+    queryKey: queryKeys.notes.detail(workspaceId, noteId),
     queryFn: async () => {
-      const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
-      return NotesClient.findOne(workspaceId, noteId, token);
+      return NotesClient.findOne(workspaceId, noteId);
     },
     enabled: !!workspaceId && !!noteId,
   });
 }
 
 export function useCreateNote(workspaceId: string) {
-  const { getToken } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (data: CreateNoteInput) => {
-      const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
-      return NotesClient.create(workspaceId, data, token);
+      return NotesClient.create(workspaceId, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workspaces', workspaceId, 'notes'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.notes.all(workspaceId) });
     },
   });
 }
 
 export function useUpdateNote(workspaceId: string) {
-  const { getToken } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateNoteInput }) => {
-      const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
-      return NotesClient.update(workspaceId, id, data, token);
+      return NotesClient.update(workspaceId, id, data);
     },
     onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: ['workspaces', workspaceId, 'notes'] });
+      await queryClient.cancelQueries({ queryKey: queryKeys.notes.all(workspaceId) });
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['workspaces', workspaceId, 'notes'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.notes.all(workspaceId) });
     },
   });
 }
 
 export function useDeleteNote(workspaceId: string) {
-  const { getToken } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
-      return NotesClient.delete(workspaceId, id, token);
+      return NotesClient.delete(workspaceId, id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workspaces', workspaceId, 'notes'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.notes.all(workspaceId) });
     },
   });
 }

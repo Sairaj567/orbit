@@ -6,6 +6,10 @@ import { Input } from '@/components/ui/input';
 import { useUpdateHabit } from '../hooks/use-habits';
 import { useWorkspaceContext } from '@/components/layout/workspace-context';
 import type { HabitDTO } from '@orbit/shared';
+import { ProjectSelector } from '@/features/projects/components/project-selector';
+import { RecurrenceEditor } from './recurrence-editor';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 interface EditHabitDialogProps {
   habit: HabitDTO | null;
@@ -20,12 +24,18 @@ export function EditHabitDialog({ habit, open, onOpenChange }: EditHabitDialogPr
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [icon, setIcon] = useState('🔥');
+  const [projectId, setProjectId] = useState('');
+  const [rrule, setRrule] = useState('FREQ=DAILY');
+  const [archived, setArchived] = useState(false);
 
   useEffect(() => {
     if (habit) {
       setTitle(habit.title);
       setDescription(habit.description || '');
       setIcon(habit.icon || '🔥');
+      setProjectId(habit.projectId);
+      setRrule(habit.rrule || 'FREQ=DAILY');
+      setArchived(habit.archived || false);
     }
   }, [habit]);
 
@@ -33,18 +43,24 @@ export function EditHabitDialog({ habit, open, onOpenChange }: EditHabitDialogPr
     e.preventDefault();
     if (!title.trim() || !habit) return;
 
-    updateHabit.mutate({
-      id: habit.id,
-      data: {
-        title: title.trim(),
-        description: description.trim() || undefined,
-        icon,
+    updateHabit.mutate(
+      {
+        id: habit.id,
+        data: {
+          title: title.trim(),
+          description: description.trim() || undefined,
+          icon,
+          projectId,
+          rrule,
+          archived,
+        },
       },
-    }, {
-      onSuccess: () => {
-        onOpenChange(false);
-      }
-    });
+      {
+        onSuccess: () => {
+          onOpenChange(false);
+        },
+      },
+    );
   };
 
   return (
@@ -55,7 +71,12 @@ export function EditHabitDialog({ habit, open, onOpenChange }: EditHabitDialogPr
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           <div className="space-y-2">
-            <label htmlFor="edit-title" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Habit Name</label>
+            <label
+              htmlFor="edit-title"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Habit Name
+            </label>
             <Input
               id="edit-title"
               value={title}
@@ -64,7 +85,12 @@ export function EditHabitDialog({ habit, open, onOpenChange }: EditHabitDialogPr
             />
           </div>
           <div className="space-y-2">
-            <label htmlFor="edit-description" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Description (optional)</label>
+            <label
+              htmlFor="edit-description"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Description (optional)
+            </label>
             <Input
               id="edit-description"
               value={description}
@@ -72,12 +98,25 @@ export function EditHabitDialog({ habit, open, onOpenChange }: EditHabitDialogPr
             />
           </div>
           <div className="space-y-2">
-            <label htmlFor="edit-icon" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Icon (Emoji)</label>
-            <Input
-              id="edit-icon"
-              value={icon}
-              onChange={(e) => setIcon(e.target.value)}
-            />
+            <label
+              htmlFor="edit-icon"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Icon (Emoji)
+            </label>
+            <Input id="edit-icon" value={icon} onChange={(e) => setIcon(e.target.value)} />
+          </div>
+          <ProjectSelector value={projectId} onChange={setProjectId} />
+          <RecurrenceEditor value={rrule} onChange={setRrule} />
+
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div className="space-y-0.5">
+              <Label>Archive Habit</Label>
+              <div className="text-xs text-muted-foreground">
+                Archived habits won't show up in your daily list.
+              </div>
+            </div>
+            <Switch checked={archived} onCheckedChange={setArchived} />
           </div>
           <div className="flex justify-end gap-2 pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

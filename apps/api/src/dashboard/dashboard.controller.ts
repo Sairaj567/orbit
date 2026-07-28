@@ -1,11 +1,11 @@
 import { Controller, Get, UseGuards, Request } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
-import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
+import { SessionAuthGuard } from '../auth/guards/session-auth.guard';
 import { WorkspaceMembershipGuard } from '../auth/guards/workspace-membership.guard';
 import { WorkspaceId } from '../common/decorators/workspace-id.decorator';
 
 @Controller('workspaces/:workspaceId/dashboard')
-@UseGuards(ClerkAuthGuard, WorkspaceMembershipGuard)
+@UseGuards(SessionAuthGuard, WorkspaceMembershipGuard)
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 

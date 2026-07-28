@@ -11,10 +11,8 @@ export default () => ({
     url: process.env.REDIS_URL || 'redis://localhost:6379',
   },
 
-  clerk: {
-    secretKey: process.env.CLERK_SECRET_KEY,
-    publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
-    webhookSecret: process.env.CLERK_WEBHOOK_SECRET,
+  auth: {
+    sessionSecret: process.env.SESSION_SECRET || 'dev-secret-do-not-use-in-prod',
   },
 
   storage: {

@@ -50,6 +50,18 @@ export class ResourcesService {
     } else {
       await this.permissionsService.requireWorkspaceRole(workspaceId, userId, 'MEMBER');
     }
+    if (data.taskId) {
+      const task = await this.prisma.task.findUnique({ where: { id: data.taskId } });
+      const targetProjectId = data.projectId !== undefined ? data.projectId : null;
+      if (
+        !task ||
+        task.workspaceId !== workspaceId ||
+        (targetProjectId && task.projectId !== targetProjectId)
+      ) {
+        throw new NotFoundException('Task not found or does not belong to this project');
+      }
+    }
+
     const type = data.type || this.detectResourceType(data.url);
     const title = data.title || this.extractTitle(data.url);
 

@@ -1,11 +1,11 @@
 import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
 import { AiService } from './ai.service';
-import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
+import { SessionAuthGuard } from '../auth/guards/session-auth.guard';
 import { WorkspaceMembershipGuard } from '../auth/guards/workspace-membership.guard';
 import { WorkspaceId } from '../common/decorators/workspace-id.decorator';
 
 @Controller('workspaces/:workspaceId/ai')
-@UseGuards(ClerkAuthGuard, WorkspaceMembershipGuard)
+@UseGuards(SessionAuthGuard, WorkspaceMembershipGuard)
 export class AiController {
   constructor(private readonly aiService: AiService) {}
 

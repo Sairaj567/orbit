@@ -2,32 +2,47 @@ import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Clock, Calendar as CalendarIcon } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { useWorkspaceContext } from '@/components/layout/workspace-context';
-import { useTasks } from '@/features/tasks/hooks/use-tasks';
+import { useCalendar } from '@/features/calendar/hooks/use-calendar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import type { Task } from '@orbit/shared';
 
 export function CalendarPage() {
   const { workspace } = useWorkspaceContext();
-  const { data: tasksData, isLoading } = useTasks(workspace.slug);
-  const tasks: Task[] = tasksData?.data || [];
-
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<number>(new Date().getDate());
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
-  const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDayOfWeek = new Date(year, month, 1).getDay();
+
+  const startDate = new Date(year, month, 1).toISOString();
+  const endDate = new Date(year, month, daysInMonth, 23, 59, 59).toISOString();
+
+  const { data: calendarData, isLoading } = useCalendar(workspace.slug, startDate, endDate);
+
+  const tasks = calendarData?.tasks || [];
+  const studyBlocks = calendarData?.studyBlocks || [];
+  const habits = calendarData?.habits || [];
+
+  const monthNames = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
 
   const handlePrevMonth = () => {
     setCurrentDate(new Date(year, month - 1, 1));
@@ -42,19 +57,66 @@ export function CalendarPage() {
     setSelectedDay(new Date().getDate());
   };
 
-  // Group tasks by day in current month
-  const tasksByDay: Record<number, Task[]> = {};
-  tasks.forEach((task: Task) => {
+  // Group items by day in current month
+  const itemsByDay: Record<
+    number,
+    {
+      id: string;
+      title: string;
+      type: 'task' | 'study' | 'habit';
+      status?: string;
+      description?: string;
+    }[]
+  > = {};
+
+  tasks.forEach((task) => {
     if (!task.dueDate) return;
     const due = new Date(task.dueDate);
     if (due.getFullYear() === year && due.getMonth() === month) {
       const dayNum = due.getDate();
-      if (!tasksByDay[dayNum]) tasksByDay[dayNum] = [];
-      tasksByDay[dayNum].push(task);
+      if (!itemsByDay[dayNum]) itemsByDay[dayNum] = [];
+      itemsByDay[dayNum].push({
+        id: task.id,
+        title: task.title,
+        type: 'task',
+        status: task.status,
+        description: task.description || undefined,
+      });
     }
   });
 
-  const selectedTasks = tasksByDay[selectedDay] || [];
+  studyBlocks.forEach((block) => {
+    const started = new Date(block.startedAt);
+    if (started.getFullYear() === year && started.getMonth() === month) {
+      const dayNum = started.getDate();
+      if (!itemsByDay[dayNum]) itemsByDay[dayNum] = [];
+      itemsByDay[dayNum].push({
+        id: block.id,
+        title: `Study Session`,
+        type: 'study',
+        status: block.status,
+        description: `${block.actualDuration || block.plannedDuration} mins`,
+      });
+    }
+  });
+
+  // Adding habits to everyday of the month for now (assuming daily habits for MVP)
+  habits.forEach((habit) => {
+    for (let i = 1; i <= daysInMonth; i++) {
+      if (!itemsByDay[i]) {
+        itemsByDay[i] = [];
+      }
+      itemsByDay[i]?.push({
+        id: `${habit.id}-${i}`,
+        title: habit.title,
+        type: 'habit',
+        status: 'PENDING',
+        description: habit.description || undefined,
+      });
+    }
+  });
+
+  const selectedItems = itemsByDay[selectedDay] || [];
 
   return (
     <div className="space-y-6">
@@ -112,7 +174,7 @@ export function CalendarPage() {
                 {/* Day cells */}
                 {Array.from({ length: daysInMonth }).map((_, i) => {
                   const dayNum = i + 1;
-                  const dayTasks = tasksByDay[dayNum] || [];
+                  const dayItems = itemsByDay[dayNum] || [];
                   const isToday =
                     dayNum === new Date().getDate() &&
                     month === new Date().getMonth() &&
@@ -129,22 +191,22 @@ export function CalendarPage() {
                         isSelected
                           ? 'border-primary bg-primary/10 shadow-sm'
                           : 'border-transparent hover:bg-muted/50',
-                        isToday && 'font-bold text-primary'
+                        isToday && 'font-bold text-primary',
                       )}
                     >
                       <span
                         className={cn(
                           'w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold',
-                          isToday ? 'bg-primary text-primary-foreground' : ''
+                          isToday ? 'bg-primary text-primary-foreground' : '',
                         )}
                       >
                         {dayNum}
                       </span>
-                      {dayTasks.length > 0 && (
+                      {dayItems.length > 0 && (
                         <div className="w-full flex items-center gap-1 overflow-hidden">
                           <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
                           <span className="text-[10px] text-muted-foreground truncate font-medium">
-                            {dayTasks.length} {dayTasks.length === 1 ? 'task' : 'tasks'}
+                            {dayItems.length} {dayItems.length === 1 ? 'item' : 'items'}
                           </span>
                         </div>
                       )}
@@ -163,29 +225,42 @@ export function CalendarPage() {
               Agenda — {monthNames[month]} {selectedDay}, {year}
             </h4>
 
-            {selectedTasks.length === 0 ? (
+            {selectedItems.length === 0 ? (
               <div className="text-center py-8 space-y-2">
                 <Clock className="w-8 h-8 text-muted-foreground mx-auto opacity-50" />
-                <p className="text-sm font-medium text-muted-foreground">No tasks scheduled for this day</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  No events scheduled for this day
+                </p>
               </div>
             ) : (
               <div className="space-y-3">
-                {selectedTasks.map((t) => (
+                {selectedItems.map((item) => (
                   <div
-                    key={t.id}
+                    key={item.id}
                     className="p-3 rounded-xl border border-border bg-card hover:border-primary/50 transition-all space-y-1"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-foreground line-clamp-1">{t.title}</span>
-                      <Badge
-                        variant={t.status === 'DONE' ? 'default' : 'outline'}
-                        className="text-[10px] uppercase"
-                      >
-                        {t.status}
-                      </Badge>
+                      <span className="text-sm font-semibold text-foreground line-clamp-1">
+                        {item.type === 'study' ? '📚 ' : item.type === 'habit' ? '🔁 ' : '✅ '}
+                        {item.title}
+                      </span>
+                      {item.status && (
+                        <Badge
+                          variant={
+                            item.status === 'DONE' || item.status === 'COMPLETED'
+                              ? 'default'
+                              : 'outline'
+                          }
+                          className="text-[10px] uppercase"
+                        >
+                          {item.status}
+                        </Badge>
+                      )}
                     </div>
-                    {t.description && (
-                      <p className="text-xs text-muted-foreground line-clamp-2">{t.description}</p>
+                    {item.description && (
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {item.description}
+                      </p>
                     )}
                   </div>
                 ))}
@@ -196,4 +271,4 @@ export function CalendarPage() {
       </div>
     </div>
   );
-}
+}

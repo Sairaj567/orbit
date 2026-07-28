@@ -1,13 +1,13 @@
 import { Body, Controller, Get, Patch, Req, UseGuards, UsePipes } from '@nestjs/common';
 import { envelope, updateUserSchema } from '@orbit/shared';
 import type { UpdateUserInput } from '@orbit/shared';
-import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
+import { SessionAuthGuard } from '../auth/guards/session-auth.guard';
 import type { AuthenticatedRequest } from '../auth/types';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { UsersService } from './users.service';
 
 @Controller('users')
-@UseGuards(ClerkAuthGuard)
+@UseGuards(SessionAuthGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 

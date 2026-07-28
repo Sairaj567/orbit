@@ -9,6 +9,7 @@ Orbit is a shared productivity and life management system built to co-manage tas
 As of completion of **Milestone 1 (Foundation)**, the project structure, dependency pipelines, shared types, and build scripts are fully functional and compile successfully. The **Milestone 2 (Design System)** specifications have also been drafted.
 
 ### Monorepo Structure
+
 Orbit utilizes **Turborepo** and **pnpm Workspaces** to manage the frontend application, backend application, and shared package.
 
 - **`/apps/web`**: Single Page Application built with React 19, Vite, Tailwind CSS v4, and shadcn/ui.
@@ -62,15 +63,15 @@ orbit/
 
 ## 3. Technology Stack
 
-| Layer | Technology | Status / Usage |
-| :--- | :--- | :--- |
+| Layer                | Technology       | Status / Usage                                      |
+| :------------------- | :--------------- | :-------------------------------------------------- |
 | **Monorepo Manager** | Turborepo + pnpm | Project building orchestration & dependency caching |
-| **Frontend** | React 19 + Vite | UI framework and developer build server |
-| **Styling** | Tailwind CSS v4 | CSS-first custom theme design tokens |
-| **Backend** | NestJS | Robust modular application backend framework |
-| **Database ORM** | Prisma | PostgreSQL interface & type-safe queries |
-| **Caching/Queuing** | Redis | Caching, bullMQ runner, and pub/sub gateway |
-| **Auth Gateway** | Clerk | MFA, OAuth session handshakes, and route guards |
+| **Frontend**         | React 19 + Vite  | UI framework and developer build server             |
+| **Styling**          | Tailwind CSS v4  | CSS-first custom theme design tokens                |
+| **Backend**          | NestJS           | Robust modular application backend framework        |
+| **Database ORM**     | Prisma           | PostgreSQL interface & type-safe queries            |
+| **Caching/Queuing**  | Redis            | Caching, bullMQ runner, and pub/sub gateway         |
+| **Auth Gateway**     | Clerk            | MFA, OAuth session handshakes, and route guards     |
 
 ---
 
@@ -79,17 +80,21 @@ orbit/
 Follow these steps to configure, build, and run Orbit in your local development environment.
 
 ### 4.1 Prerequisites
+
 - **Node.js**: `>=20.0.0`
 - **pnpm**: `^9.15.0`
 - **Docker & Docker Compose**: Installed and active.
 
 ### 4.2 Installation
+
 Install all dependencies across the monorepo from the root:
+
 ```bash
 pnpm install
 ```
 
 ### 4.3 Configure Environment Variables
+
 1. Copy the template `.env.example` file in the root directory to `.env`:
    ```bash
    cp .env.example .env
@@ -97,6 +102,7 @@ pnpm install
 2. Populate the required keys (specifically `DATABASE_URL`, `REDIS_URL`, and Clerk authentication keys).
 
 ### 4.4 Build & Generate Code
+
 1. Start the Docker containers for PostgreSQL and Redis:
    ```bash
    docker compose up -d
@@ -111,10 +117,13 @@ pnpm install
    ```
 
 ### 4.5 Run Local Development Servers
+
 Run the development servers concurrently with cache-disabled rebuilds:
+
 ```bash
 pnpm dev
 ```
+
 - **Web App**: Accessible at `http://localhost:5173`
 - **API Server**: Running at `http://localhost:3001`
 
@@ -123,3 +132,12 @@ pnpm dev
 ## 5. Next Steps
 
 With Milestone 1 fully compiled and verified, the next phase focuses on translating the draft **[design_system.md](file:///C:/Users/saira/.gemini/antigravity/brain/b2e75374-312d-4cfe-9f83-7c3e5038cce1/design_system.md)** spec into core UI component libraries, layout frameworks, and responsive pages.
+
+---
+
+## 6. Architecture Constraints
+
+### Realtime State & Deployment
+
+- **Single Instance Constraint:** The `RealtimeGateway` (Socket.IO server) currently maintains in-memory maps of connected users to support rapid eviction workflows and caching updates across the client. The backend MUST remain explicitly deployed as a single Node.js process (single instance) to prevent event delivery failures and desynchronization.
+- **Future Scale:** Multi-instance deployments and load balancing will require the introduction of the `@nestjs/platform-socket.io` Redis Adapter and refactoring of local memory maps to Redis-backed session tracking.

@@ -1,12 +1,34 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Req,
+  UsePipes,
+} from '@nestjs/common';
 import { ProjectMembersService } from './project-members.service';
-import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
+import { SessionAuthGuard } from '../auth/guards/session-auth.guard';
 import { WorkspaceMembershipGuard } from '../auth/guards/workspace-membership.guard';
 import { AuthenticatedRequest } from '../auth/types';
 import { WorkspaceId } from '../common/decorators/workspace-id.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { z } from 'zod';
+
+const inviteProjectMemberSchema = z.object({
+  workspaceMemberId: z.string().cuid(),
+  role: z.enum(['VIEWER', 'EDITOR', 'OWNER']),
+});
+
+const updateProjectMemberRoleSchema = z.object({
+  role: z.enum(['VIEWER', 'EDITOR', 'OWNER']),
+});
 
 @Controller('workspaces/:workspaceId/projects/:projectId/members')
-@UseGuards(ClerkAuthGuard, WorkspaceMembershipGuard)
+@UseGuards(SessionAuthGuard, WorkspaceMembershipGuard)
 export class ProjectMembersController {
   constructor(private readonly projectMembersService: ProjectMembersService) {}
 
@@ -20,6 +42,7 @@ export class ProjectMembersController {
   }
 
   @Post()
+  @UsePipes(new ZodValidationPipe(inviteProjectMemberSchema))
   invite(
     @WorkspaceId() workspaceId: string,
     @Param('projectId') projectId: string,
@@ -36,6 +59,7 @@ export class ProjectMembersController {
   }
 
   @Patch(':id')
+  @UsePipes(new ZodValidationPipe(updateProjectMemberRoleSchema))
   update(
     @WorkspaceId() workspaceId: string,
     @Param('projectId') projectId: string,

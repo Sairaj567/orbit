@@ -9,15 +9,13 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { verifyToken } from '@clerk/backend';
+
+import { AuthService } from '../auth/services/auth.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { UserProvisioningService } from '../auth/services/user-provisioning.service';
 
 interface AuthenticatedSocket extends Socket {
   user?: {
     id: string;
-    clerkId: string;
     email: string;
   };
 }
@@ -38,92 +36,32 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   private readonly userSockets = new Map<string, Set<AuthenticatedSocket>>();
 
   constructor(
-    private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
-    private readonly userProvisioningService: UserProvisioningService,
+    private readonly authService: AuthService,
   ) {}
 
   async handleConnection(client: AuthenticatedSocket) {
     try {
-      // --- DEV BYPASS: skip all Clerk verification ---
-      const authMode = this.configService.get<string>('AUTH_MODE');
-      if (authMode === 'dev_bypass') {
-        const devUser = await this.userProvisioningService.provisionDevUser();
-        client.user = {
-          id: devUser.id,
-          clerkId: devUser.clerkId,
-          email: devUser.email,
-        };
-
-        let sockets = this.userSockets.get(devUser.id);
-        if (!sockets) {
-          sockets = new Set();
-          this.userSockets.set(devUser.id, sockets);
-        }
-        sockets.add(client);
-
-        this.logger.log(`[DEV BYPASS] Client connected: ${client.id} (Dev User: ${devUser.id})`);
-        client.emit('authenticated', { userId: devUser.id });
-        return;
-      }
-      // --- END DEV BYPASS ---
-
-      // Extract token from handshake auth
-      const token = client.handshake.auth?.token;
+      const cookies = client.handshake.headers.cookie;
+      const token = cookies
+        ?.split(';')
+        .find((c) => c.trim().startsWith('orbit_session='))
+        ?.split('=')[1];
 
       if (!token) {
-        throw new Error('No token provided');
+        throw new Error('No session cookie provided');
       }
 
-      const secretKey = this.configService.get<string>('clerk.secretKey');
-      if (!secretKey) {
-        throw new Error('Clerk secret key is not configured');
+      const session = await this.authService.validateSession(token);
+
+      if (!session) {
+        throw new Error('Invalid or expired session');
       }
 
-      // Verify the token
-      const payload = await verifyToken(token, { secretKey });
-      const clerkId = payload.sub;
-
-      if (!clerkId) {
-        throw new Error('Clerk token is missing a subject');
-      }
-
-      // Find user in DB
-      const dbUser = await this.prisma.user.findUnique({
-        where: { clerkId },
-        select: { id: true, clerkId: true, email: true, deletedAt: true },
-      });
-
-      if (dbUser?.deletedAt) {
-        throw new Error('User account has been deleted');
-      }
-
-      let user = dbUser ? { id: dbUser.id, clerkId: dbUser.clerkId, email: dbUser.email } : null;
-
-      if (!user) {
-        try {
-          const provisioned = await this.userProvisioningService.provisionUserJit(
-            clerkId,
-            secretKey,
-          );
-          user = {
-            id: provisioned.id,
-            clerkId: provisioned.clerkId,
-            email: provisioned.email,
-          };
-        } catch (error) {
-          this.logger.error(
-            `JIT provisioning failed during socket connection for ${clerkId}`,
-            error,
-          );
-          client.emit('provisioning_error', {
-            message: 'User provisioning failed. Authentication service unavailable.',
-            code: 'SERVICE_UNAVAILABLE',
-          });
-          client.disconnect(true);
-          return;
-        }
-      }
+      const user = {
+        id: session.user.id,
+        email: session.user.email,
+      };
 
       // Attach user to socket
       client.user = user;
@@ -259,7 +197,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       where: { workspaceId },
       select: { id: true },
     });
-    const projectIds = new Set(projects.map((p) => p.id));
+    const projectIds = new Set(projects.map((p: any) => p.id));
     const workspaceRoom = `workspace:${workspaceId}`;
 
     for (const socket of sockets) {

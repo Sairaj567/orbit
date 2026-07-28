@@ -8,14 +8,14 @@ import {
   CompleteStudyBlockInput,
   CompleteStudyBlockSchema,
 } from '@orbit/shared';
-import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
+import { SessionAuthGuard } from '../auth/guards/session-auth.guard';
 import { WorkspaceMembershipGuard } from '../auth/guards/workspace-membership.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { WorkspaceId } from '../common/decorators/workspace-id.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 
 @Controller('workspaces/:workspaceId/study-blocks')
-@UseGuards(ClerkAuthGuard, WorkspaceMembershipGuard)
+@UseGuards(SessionAuthGuard, WorkspaceMembershipGuard)
 export class StudyBlocksController {
   constructor(private readonly studyBlocksService: StudyBlocksService) {}
 
@@ -31,6 +31,11 @@ export class StudyBlocksController {
   @Get('active')
   findActive(@WorkspaceId() workspaceId: string, @CurrentUser('id') userId: string) {
     return this.studyBlocksService.findActive(workspaceId, userId);
+  }
+
+  @Get('history')
+  findHistory(@WorkspaceId() workspaceId: string, @CurrentUser('id') userId: string) {
+    return this.studyBlocksService.findHistory(workspaceId, userId, 20);
   }
 
   @Patch(':id')

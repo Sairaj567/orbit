@@ -19,14 +19,14 @@ import {
   updateResourceSchema,
   resourceQuerySchema,
 } from '@orbit/shared';
-import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
+import { SessionAuthGuard } from '../auth/guards/session-auth.guard';
 import { WorkspaceMembershipGuard } from '../auth/guards/workspace-membership.guard';
 import { WorkspaceId } from '../common/decorators/workspace-id.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @Controller('workspaces/:workspaceId/resources')
-@UseGuards(ClerkAuthGuard, WorkspaceMembershipGuard)
+@UseGuards(SessionAuthGuard, WorkspaceMembershipGuard)
 export class ResourcesController {
   constructor(private readonly resourcesService: ResourcesService) {}
 

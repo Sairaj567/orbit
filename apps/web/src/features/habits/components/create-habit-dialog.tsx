@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 
 import { useCreateHabit } from '../hooks/use-habits';
 import { useWorkspaceContext } from '@/components/layout/workspace-context';
+import { RecurrenceEditor } from './recurrence-editor';
 
 interface CreateHabitDialogProps {
   open: boolean;
@@ -19,27 +20,31 @@ export function CreateHabitDialog({ open, onOpenChange, projectId }: CreateHabit
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [icon, setIcon] = useState('🔥');
+  const [rrule, setRrule] = useState('FREQ=DAILY');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
 
-    createHabit.mutate({
-      projectId,
-      title: title.trim(),
-      description: description.trim() || undefined,
-      icon,
-      // For V1, default to daily recurrence
-      rrule: 'FREQ=DAILY',
-      recurrenceType: 'FIXED',
-    }, {
-      onSuccess: () => {
-        onOpenChange(false);
-        setTitle('');
-        setDescription('');
-        setIcon('🔥');
-      }
-    });
+    createHabit.mutate(
+      {
+        projectId,
+        title: title.trim(),
+        description: description.trim() || undefined,
+        icon,
+        rrule,
+        recurrenceType: 'FIXED',
+      },
+      {
+        onSuccess: () => {
+          onOpenChange(false);
+          setTitle('');
+          setDescription('');
+          setIcon('🔥');
+          setRrule('FREQ=DAILY');
+        },
+      },
+    );
   };
 
   return (
@@ -50,7 +55,9 @@ export function CreateHabitDialog({ open, onOpenChange, projectId }: CreateHabit
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           <div className="grid gap-2">
-            <label htmlFor="name" className="text-sm font-medium">Name</label>
+            <label htmlFor="name" className="text-sm font-medium">
+              Name
+            </label>
             <Input
               id="title"
               placeholder="e.g. Drink Water"
@@ -60,7 +67,9 @@ export function CreateHabitDialog({ open, onOpenChange, projectId }: CreateHabit
             />
           </div>
           <div className="grid gap-2">
-            <label htmlFor="description" className="text-sm font-medium">Description (optional)</label>
+            <label htmlFor="description" className="text-sm font-medium">
+              Description (optional)
+            </label>
             <Input
               id="description"
               placeholder="e.g. 2 liters per day"
@@ -69,7 +78,9 @@ export function CreateHabitDialog({ open, onOpenChange, projectId }: CreateHabit
             />
           </div>
           <div className="grid gap-2">
-            <label htmlFor="emoji" className="text-sm font-medium">Emoji (Optional)</label>
+            <label htmlFor="emoji" className="text-sm font-medium">
+              Emoji (Optional)
+            </label>
             <Input
               id="icon"
               placeholder="🔥"
@@ -77,6 +88,7 @@ export function CreateHabitDialog({ open, onOpenChange, projectId }: CreateHabit
               onChange={(e) => setIcon(e.target.value)}
             />
           </div>
+          <RecurrenceEditor value={rrule} onChange={setRrule} />
           <div className="flex justify-end gap-2 pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel

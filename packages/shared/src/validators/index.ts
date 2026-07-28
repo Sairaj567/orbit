@@ -54,6 +54,19 @@ export const taskQuerySchema = paginationSchema.extend({
   tags: z.array(z.string()).optional(),
 });
 
+export const createTaskCommentSchema = z.object({
+  content: z.string().min(1).max(5000),
+});
+
+export const updateTaskCommentSchema = createTaskCommentSchema.partial();
+
+export const createCategorySchema = z.object({
+  name: z.string().min(1).max(50),
+  color: z.string().max(20).optional().nullable(),
+});
+
+export const updateCategorySchema = createCategorySchema.partial();
+
 export const createProjectSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(2000).optional().nullable(),
@@ -116,6 +129,7 @@ export const noteQuerySchema = z.object({
   projectId: z.string().cuid().optional(),
   taskId: z.string().cuid().optional(),
   isPinned: z.boolean().optional(),
+  search: z.string().optional(),
 });
 
 export type NoteQueryInput = z.infer<typeof noteQuerySchema>;
@@ -153,6 +167,12 @@ export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 export type TaskQueryInput = z.infer<typeof taskQuerySchema>;
 export type PaginationInput = z.infer<typeof paginationSchema>;
 
+export type CreateTaskCommentInput = z.infer<typeof createTaskCommentSchema>;
+export type UpdateTaskCommentInput = z.infer<typeof updateTaskCommentSchema>;
+
+export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
+export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>;
+
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 export type ProjectQueryInput = z.infer<typeof projectQuerySchema>;
@@ -172,3 +192,41 @@ export const updateUserSchema = z.object({
 });
 
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
+
+// ─── Auth Schemas ──────────────────────────────────────────
+
+export const registerSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .email('Invalid email address')
+    .max(255, 'Email must not exceed 255 characters'),
+  password: z
+    .string()
+    .min(8, 'Password must be at least 8 characters')
+    .max(128, 'Password must not exceed 128 characters'),
+  displayName: z
+    .string()
+    .trim()
+    .min(1, 'Display name is required')
+    .max(100, 'Display name must not exceed 100 characters'),
+});
+
+export type RegisterInput = z.infer<typeof registerSchema>;
+
+export const loginSchema = z.object({
+  email: z.string().trim().email('Invalid email address'),
+  password: z.string().min(1, 'Password is required'),
+});
+
+export type LoginInput = z.infer<typeof loginSchema>;
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newPassword: z
+    .string()
+    .min(8, 'New password must be at least 8 characters')
+    .max(128, 'New password must not exceed 128 characters'),
+});
+
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;

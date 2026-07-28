@@ -25,15 +25,19 @@ export function MemberRow({ member, currentUserId, currentUserRole }: MemberRowP
   const isSelf = member.userId === currentUserId;
   const isOwner = member.role === 'OWNER';
   const isPending = member.status === 'PENDING';
-  
-  // Only owners and admins can manage members, but no one can manage the owner
-  const canManage = !isSelf && !isOwner && (currentUserRole === 'OWNER' || currentUserRole === 'ADMIN');
 
-  const RoleIcon = 
-    member.role === 'OWNER' ? ShieldAlert :
-    member.role === 'ADMIN' ? ShieldCheck :
-    member.role === 'MEMBER' ? Shield :
-    User;
+  // Only owners and admins can manage members, but no one can manage the owner
+  const canManage =
+    !isSelf && !isOwner && (currentUserRole === 'OWNER' || currentUserRole === 'ADMIN');
+
+  const RoleIcon =
+    member.role === 'OWNER'
+      ? ShieldAlert
+      : member.role === 'ADMIN'
+        ? ShieldCheck
+        : member.role === 'MEMBER'
+          ? Shield
+          : User;
 
   const handleRoleChange = (newRole: 'ADMIN' | 'MEMBER' | 'VIEWER') => {
     updateRole({ memberId: member.id, role: newRole });
@@ -57,8 +61,16 @@ export function MemberRow({ member, currentUserId, currentUserRole }: MemberRowP
         <div className="flex flex-col">
           <span className="font-medium text-foreground flex items-center gap-2">
             {member.user?.displayName || member.email}
-            {isSelf && <Badge variant="secondary" className="text-[10px] h-5 px-1.5">You</Badge>}
-            {isPending && <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-dashed">Pending</Badge>}
+            {isSelf && (
+              <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
+                You
+              </Badge>
+            )}
+            {isPending && (
+              <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-dashed">
+                Pending
+              </Badge>
+            )}
           </span>
           <span className="text-sm text-muted-foreground flex items-center gap-1.5">
             <RoleIcon className="h-3.5 w-3.5" />
@@ -77,18 +89,45 @@ export function MemberRow({ member, currentUserId, currentUserRole }: MemberRowP
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleRoleChange('ADMIN')} disabled={member.role === 'ADMIN'}>
+              {isPending && (
+                <>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        `${window.location.origin}/invite/${member.id}`,
+                      );
+                      alert('Invite link copied to clipboard');
+                    }}
+                  >
+                    Copy Invite Link
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              <DropdownMenuItem
+                onClick={() => handleRoleChange('ADMIN')}
+                disabled={member.role === 'ADMIN'}
+              >
                 Make Admin
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleRoleChange('MEMBER')} disabled={member.role === 'MEMBER'}>
+              <DropdownMenuItem
+                onClick={() => handleRoleChange('MEMBER')}
+                disabled={member.role === 'MEMBER'}
+              >
                 Make Member
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleRoleChange('VIEWER')} disabled={member.role === 'VIEWER'}>
+              <DropdownMenuItem
+                onClick={() => handleRoleChange('VIEWER')}
+                disabled={member.role === 'VIEWER'}
+              >
                 Make Viewer
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive focus:bg-destructive/10" onClick={handleRemove}>
-                Remove from workspace
+              <DropdownMenuItem
+                className="text-destructive focus:bg-destructive/10"
+                onClick={handleRemove}
+              >
+                {isPending ? 'Revoke Invite' : 'Remove from workspace'}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

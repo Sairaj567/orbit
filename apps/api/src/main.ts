@@ -1,9 +1,12 @@
 import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { Logger as PinoLogger } from 'nestjs-pino';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
+import * as Sentry from '@sentry/node';
+import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import helmet from 'helmet';
 import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -11,11 +14,18 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 async function bootstrap() {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN || '',
+    integrations: [nodeProfilingIntegration()],
+    tracesSampleRate: 1.0,
+    profilesSampleRate: 1.0,
+  });
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
   });
 
-  app.useLogger(app.get(PinoLogger));
+  app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
 
   const logger = new Logger('Bootstrap');
   const port = process.env.PORT || 3001;
@@ -24,13 +34,14 @@ async function bootstrap() {
   // Security
   app.use(helmet());
   app.use(compression());
+  app.use(cookieParser());
 
   // CORS
   app.enableCors({
     origin: corsOrigin.split(',').map((o) => o.trim()),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Workspace-Id'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Workspace-Id', 'x-csrf-token'],
   });
 
   // Global prefix

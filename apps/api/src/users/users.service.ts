@@ -1,5 +1,4 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
 import type { UpdateUserInput } from '@orbit/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -12,7 +11,6 @@ export class UsersService {
       where: { id: userId, deletedAt: null },
       select: {
         id: true,
-        clerkId: true,
         email: true,
         displayName: true,
         avatarUrl: true,
@@ -38,16 +36,16 @@ export class UsersService {
     const updatedPreferences =
       input.preferences !== undefined
         ? {
-            ...((existingUser.preferences as Prisma.JsonObject) || {}),
+            ...((existingUser.preferences as any) || {}),
             ...input.preferences,
           }
         : undefined;
 
-    const dataToUpdate: Prisma.UserUpdateInput = {
+    const dataToUpdate: any = {
       ...(input.displayName !== undefined && { displayName: input.displayName }),
       ...(input.timezone !== undefined && { timezone: input.timezone }),
       ...(updatedPreferences !== undefined && {
-        preferences: updatedPreferences as Prisma.InputJsonValue,
+        preferences: updatedPreferences as any,
       }),
     };
 
@@ -56,7 +54,6 @@ export class UsersService {
       data: dataToUpdate,
       select: {
         id: true,
-        clerkId: true,
         email: true,
         displayName: true,
         avatarUrl: true,

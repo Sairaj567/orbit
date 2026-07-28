@@ -1,6 +1,7 @@
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { LoggerModule } from 'nestjs-pino';
+import { WinstonModule, utilities as nestWinstonModuleUtilities } from 'nest-winston';
+import * as winston from 'winston';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -19,8 +20,12 @@ import { StudyBlocksModule } from './study-blocks/study-blocks.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { AiModule } from './ai/ai.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
-import { WebhooksModule } from './webhooks/webhooks.module';
 import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
+import { CategoriesModule } from './categories/categories.module';
+import { CalendarModule } from './calendar/calendar.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { CsrfMiddleware } from './common/middleware/csrf.middleware';
 import configuration from './config/configuration';
 import { validateEnv } from './config/env.validation';
 
@@ -32,17 +37,23 @@ import { validateEnv } from './config/env.validation';
       validate: validateEnv,
       expandVariables: true,
     }),
-    LoggerModule.forRoot({
-      pinoHttp: {
-        level: process.env.NODE_ENV !== 'production' ? 'debug' : 'info',
-        transport:
-          process.env.NODE_ENV !== 'production'
-            ? { target: 'pino-pretty', options: { singleLine: true } }
-            : undefined,
-      },
+    WinstonModule.forRoot({
+      transports: [
+        new winston.transports.Console({
+          format: winston.format.combine(
+            winston.format.timestamp(),
+            winston.format.ms(),
+            nestWinstonModuleUtilities.format.nestLike('Orbit', {
+              colors: true,
+              appName: true,
+            }),
+          ),
+        }),
+      ],
     }),
     PrismaModule,
     RedisModule,
+    AuthModule,
     UsersModule,
     WorkspacesModule,
     TasksModule,
@@ -53,14 +64,20 @@ import { validateEnv } from './config/env.validation';
     MembersModule,
     ActivityModule,
     RealtimeModule,
+    AnalyticsModule,
     ProjectPermissionsModule,
     HabitsModule,
     StudyBlocksModule,
     DashboardModule,
+    CalendarModule,
     AiModule,
-    WebhooksModule,
+    CategoriesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(CsrfMiddleware).forRoutes('*');
+  }
+}

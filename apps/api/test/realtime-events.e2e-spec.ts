@@ -14,20 +14,6 @@ import { TransformInterceptor } from '../src/common/interceptors/transform.inter
 import { assertTestDatabaseSafety, resetTestDatabase } from './helpers/test-db-safety';
 import { ensureNoEvent, waitForEvent } from './helpers/socket-test-helpers';
 
-jest.mock('@clerk/backend', () => {
-  const original = jest.requireActual('@clerk/backend');
-  return {
-    ...original,
-    verifyToken: jest.fn().mockImplementation(async (token: string) => {
-      if (token && token.startsWith('valid_token_')) {
-        const clerkId = token.replace('valid_token_', 'clerk_');
-        return { sub: clerkId };
-      }
-      throw new Error('Invalid or expired Clerk token');
-    }),
-  };
-});
-
 describe('Realtime Socket.IO E2E Integration (Real Server & Sockets)', () => {
   let app: NestExpressApplication;
   let prisma: PrismaService;
@@ -91,7 +77,9 @@ describe('Realtime Socket.IO E2E Integration (Real Server & Sockets)', () => {
 
   function createClientSocket(token: string): Socket {
     const socket = io(serverUrl, {
-      auth: { token },
+      extraHeaders: {
+        cookie: `orbit_session=${token}`,
+      },
       transports: ['websocket'],
       forceNew: true,
       reconnection: false,
@@ -105,9 +93,19 @@ describe('Realtime Socket.IO E2E Integration (Real Server & Sockets)', () => {
     await prisma.user.create({
       data: {
         id: 'usr_rt_1',
-        clerkId: 'clerk_rt_1',
         email: 'rt1@test.com',
+        passwordHash: 'dummy_hash',
         displayName: 'Realtime User 1',
+      },
+    });
+
+    // Seed Session
+    await prisma.session.create({
+      data: {
+        id: 'session_rt_1',
+        userId: 'usr_rt_1',
+        token: 'valid_token_rt_1',
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7),
       },
     });
 
@@ -162,9 +160,19 @@ describe('Realtime Socket.IO E2E Integration (Real Server & Sockets)', () => {
     await prisma.user.create({
       data: {
         id: 'usr_rt_evict',
-        clerkId: 'clerk_rt_evict',
         email: 'evict@test.com',
+        passwordHash: 'dummy_hash',
         displayName: 'Evict User',
+      },
+    });
+
+    // Seed Session
+    await prisma.session.create({
+      data: {
+        id: 'session_rt_evict',
+        userId: 'usr_rt_evict',
+        token: 'valid_token_rt_evict',
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7),
       },
     });
 

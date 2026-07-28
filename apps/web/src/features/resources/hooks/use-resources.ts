@@ -1,60 +1,85 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@/lib/auth-hooks';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { ResourcesClient } from '../api/resources.client';
 import type { CreateResourceInput, ResourceQueryInput } from '@orbit/shared';
-import { useQuery } from '@tanstack/react-query';
-
-export const resourceKeys = {
-  all: (workspaceId: string) => ['resources', workspaceId] as const,
-  lists: (workspaceId: string) => [...resourceKeys.all(workspaceId), 'list'] as const,
-  list: (workspaceId: string, query: Partial<ResourceQueryInput>) =>
-    [...resourceKeys.lists(workspaceId), { query }] as const,
-};
+import { queryKeys } from '@/lib/query-keys';
+import { useRealtime } from '@/providers/realtime-provider';
+import { useEffect } from 'react';
 
 export function useResources(workspaceId: string, query: Partial<ResourceQueryInput> = {}) {
-  const { getToken } = useAuth();
+  const { subscribe } = useRealtime();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const unsubCreated = subscribe('resource.created', () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.resources.all(workspaceId) });
+    });
+    const unsubUpdated = subscribe('resource.updated', () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.resources.all(workspaceId) });
+    });
+    const unsubDeleted = subscribe('resource.deleted', () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.resources.all(workspaceId) });
+    });
+
+    return () => {
+      unsubCreated();
+      unsubUpdated();
+      unsubDeleted();
+    };
+  }, [workspaceId, subscribe, queryClient]);
 
   return useQuery({
-    queryKey: resourceKeys.list(workspaceId, query),
+    queryKey: queryKeys.resources.list(workspaceId, query),
     queryFn: async () => {
-      const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
-      return ResourcesClient.findAll(workspaceId, query, token);
+      return ResourcesClient.findAll(workspaceId, query);
     },
     enabled: !!workspaceId,
   });
 }
 
 export function useCreateResource(workspaceId: string) {
-  const { getToken } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (data: CreateResourceInput) => {
-      const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
-      return ResourcesClient.create(workspaceId, data, token);
+      return ResourcesClient.create(workspaceId, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks', workspaceId] });
-      queryClient.invalidateQueries({ queryKey: resourceKeys.lists(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.resources.all(workspaceId) });
     },
   });
 }
 
 export function useDeleteResource(workspaceId: string) {
-  const { getToken } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ id }: { id: string }) => {
-      const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
-      return ResourcesClient.remove(workspaceId, id, token);
+      return ResourcesClient.remove(workspaceId, id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks', workspaceId] });
-      queryClient.invalidateQueries({ queryKey: resourceKeys.lists(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.resources.all(workspaceId) });
+    },
+  });
+}
+
+export function useUpdateResource(workspaceId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: import('@orbit/shared').UpdateResourceInput;
+    }) => {
+      return ResourcesClient.update(workspaceId, id, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.resources.all(workspaceId) });
     },
   });
 }

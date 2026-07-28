@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RRule } from 'rrule';
 import { ActivityService } from '../activity/activity.service';
@@ -30,6 +30,17 @@ export class TasksService {
       await this.permissionsService.requireWorkspaceRole(workspaceId, creatorId, 'MEMBER');
     }
     const { assigneeIds, ...taskData } = data;
+
+    if (assigneeIds && assigneeIds.length > 0) {
+      const validMembers = await this.prisma.workspaceMember.count({
+        where: { workspaceId, userId: { in: assigneeIds }, status: 'ACTIVE' },
+      });
+      if (validMembers !== assigneeIds.length) {
+        throw new ForbiddenException(
+          'One or more assignees are not active members of this workspace',
+        );
+      }
+    }
 
     const task = await this.prisma.task.create({
       data: {
@@ -199,6 +210,24 @@ export class TasksService {
 
     const { assigneeIds, ...taskData } = data;
 
+    if (assigneeIds && assigneeIds.length > 0) {
+      const validMembers = await this.prisma.workspaceMember.count({
+        where: { workspaceId, userId: { in: assigneeIds }, status: 'ACTIVE' },
+      });
+      if (validMembers !== assigneeIds.length) {
+        throw new ForbiddenException(
+          'One or more assignees are not active members of this workspace',
+        );
+      }
+    }
+
+    const isNowDone = data.status === 'DONE' && existingTask.status !== 'DONE';
+    const isNowUndone = data.status && data.status !== 'DONE' && existingTask.status === 'DONE';
+
+    let completedAt = existingTask.completedAt;
+    if (isNowDone) completedAt = new Date();
+    else if (isNowUndone) completedAt = null;
+
     // Check if we need to clone for recurrence
     if (
       data.status === 'DONE' &&
@@ -224,7 +253,7 @@ export class TasksService {
 
         if (nextDate) {
           // Execute in transaction
-          return await this.prisma.$transaction(async (tx) => {
+          const result = await this.prisma.$transaction(async (tx) => {
             const clonedTask = await tx.task.create({
               data: {
                 title: existingTask.title,
@@ -252,6 +281,7 @@ export class TasksService {
               data: {
                 ...taskData,
                 status: 'DONE',
+                completedAt: new Date(),
                 nextOccurrenceId: clonedTask.id,
                 assignees: assigneeIds
                   ? {
@@ -265,8 +295,54 @@ export class TasksService {
               },
             });
 
-            return updatedOriginal;
+            return { updatedOriginal, clonedTask };
           });
+
+          // Emit events for the cloned task outside transaction
+          this.activityService.recordActivity({
+            workspaceId,
+            projectId: result.clonedTask.projectId || undefined,
+            userId,
+            entityType: 'TASK',
+            entityId: result.clonedTask.id,
+            action: 'CREATED',
+            metadata: { title: result.clonedTask.title, isRecurrence: true },
+          });
+
+          this.realtimeService.broadcast({
+            workspaceId,
+            projectId: result.clonedTask.projectId || undefined,
+            event: 'task.created',
+            payload: result.clonedTask,
+            actorId: userId,
+          });
+
+          this.aiService.embedEntity(
+            result.clonedTask.id,
+            'Task',
+            `${result.clonedTask.title}\n${result.clonedTask.description || ''}`,
+          );
+
+          // Return here to avoid double update
+          this.activityService.recordActivity({
+            workspaceId,
+            projectId: result.updatedOriginal.projectId || undefined,
+            userId,
+            entityType: 'TASK',
+            entityId: result.updatedOriginal.id,
+            action: 'COMPLETED',
+            metadata: { title: result.updatedOriginal.title },
+          });
+
+          this.realtimeService.broadcast({
+            workspaceId,
+            projectId: result.updatedOriginal.projectId || undefined,
+            event: 'task.completed',
+            payload: result.updatedOriginal,
+            actorId: userId,
+          });
+
+          return result.updatedOriginal;
         }
       } catch (err) {
         console.error('Failed to parse RRULE', err);
@@ -278,6 +354,7 @@ export class TasksService {
       where: { id },
       data: {
         ...taskData,
+        completedAt,
         assignees: assigneeIds
           ? {
               deleteMany: {},
@@ -319,6 +396,17 @@ export class TasksService {
       `${updatedTask.title}\n${updatedTask.description || ''}`,
     );
 
+    this.realtimeService.broadcast({
+      workspaceId,
+      projectId: updatedTask.projectId || undefined,
+      event:
+        updatedTask.status === 'DONE' && existingTask.status !== 'DONE'
+          ? 'task.completed'
+          : 'task.updated',
+      payload: updatedTask,
+      actorId: userId,
+    });
+
     return updatedTask;
   }
 
@@ -349,6 +437,14 @@ export class TasksService {
       entityId: deletedTask.id,
       action: 'DELETED',
       metadata: { title: deletedTask.title },
+    });
+
+    this.realtimeService.broadcast({
+      workspaceId,
+      projectId: deletedTask.projectId || undefined,
+      event: 'task.deleted',
+      payload: deletedTask,
+      actorId: userId,
     });
 
     return deletedTask;

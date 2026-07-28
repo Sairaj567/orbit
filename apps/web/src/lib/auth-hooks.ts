@@ -1,66 +1,68 @@
-/**
- * Auth hooks abstraction layer.
- *
- * When AUTH_MODE=clerk: re-exports real Clerk hooks unchanged.
- * When AUTH_MODE=dev_bypass: returns fixed dev-user values,
- * removing the runtime dependency on ClerkProvider and real Clerk keys.
- */
-import { env } from '@/config/env';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from './api-client';
+import type { User, LoginInput, RegisterInput, ApiResponse } from '@orbit/shared';
 
-// ── Dev bypass fixed values ───────────────────────────────────────────────────
+export function useAuth() {
+  const queryClient = useQueryClient();
 
-const DEV_AUTH = {
-  isSignedIn: true as const,
-  isLoaded: true as const,
-  userId: 'dev_user_orbit',
-  getToken: async () => 'dev_bypass_token',
-};
+  const sessionQuery = useQuery<ApiResponse<User>>({
+    queryKey: ['auth', 'session'],
+    queryFn: () => apiClient<ApiResponse<User>>('/api/v1/auth/session'),
+    retry: false, // Don't retry if not logged in
+  });
 
-const DEV_USER = {
-  isLoaded: true as const,
-  isSignedIn: true as const,
-  user: {
-    id: 'dev_user_orbit',
-    fullName: 'Dev User',
-    firstName: 'Dev',
-    lastName: 'User',
-    primaryEmailAddress: { emailAddress: 'dev@orbit.local' },
-    imageUrl: null,
-  },
-};
+  const user = sessionQuery.data?.data;
+  const isSignedIn = !!user;
+  const isLoaded = !sessionQuery.isPending;
 
-// ── Exported hooks ────────────────────────────────────────────────────────────
+  const loginMutation = useMutation({
+    mutationFn: (data: LoginInput) =>
+      apiClient<ApiResponse<void>>('/api/v1/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['auth', 'session'] });
+    },
+  });
 
-let useAuth: () => {
-  isSignedIn: boolean;
-  isLoaded: boolean;
-  userId: string;
-  getToken: () => Promise<string>;
-};
+  const registerMutation = useMutation({
+    mutationFn: (data: RegisterInput) =>
+      apiClient<ApiResponse<void>>('/api/v1/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['auth', 'session'] });
+    },
+  });
 
-let useUser: () => {
-  isLoaded: boolean;
-  isSignedIn: boolean;
-  user: {
-    id: string;
-    fullName: string;
-    firstName: string;
-    lastName: string;
-    primaryEmailAddress: { emailAddress: string } | null;
-    imageUrl: string | null;
-  } | null;
-};
+  const logoutMutation = useMutation({
+    mutationFn: () =>
+      apiClient<ApiResponse<void>>('/api/v1/auth/logout', {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      queryClient.clear();
+    },
+  });
 
-if (env.authMode === 'dev_bypass') {
-  useAuth = () => DEV_AUTH;
-  useUser = () => DEV_USER;
-} else {
-  // Dynamic import not needed — Vite will tree-shake the unused branch
-  // at build time since env.authMode is a compile-time constant.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const clerk = require('@clerk/clerk-react');
-  useAuth = clerk.useAuth;
-  useUser = clerk.useUser;
+  return {
+    user,
+    isSignedIn,
+    isLoaded,
+    login: loginMutation.mutateAsync,
+    register: registerMutation.mutateAsync,
+    logout: logoutMutation.mutateAsync,
+    isLoggingIn: loginMutation.isPending,
+    isRegistering: registerMutation.isPending,
+    isLoggingOut: logoutMutation.isPending,
+    loginError: loginMutation.error,
+    registerError: registerMutation.error,
+  };
 }
 
-export { useAuth, useUser };
+export function useUser() {
+  const { user, isLoaded, isSignedIn } = useAuth();
+  return { user, isLoaded, isSignedIn };
+}

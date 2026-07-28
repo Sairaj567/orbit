@@ -82,15 +82,22 @@ enum StudyBlockStatus {
 }
 
 model User {
-  id          String  @id @default(cuid())
-  clerkId     String  @unique
-  email       String  @unique
-  displayName String
-  avatarUrl   String?
-  timezone    String  @default("UTC")
-  preferences Json    @default("{}")
-  xp          Int     @default(0)
-  level       Int     @default(1)
+  id           String  @id @default(cuid())
+  email        String  @unique
+  passwordHash String
+  displayName  String
+  avatarUrl    String?
+  timezone     String  @default("UTC")
+  preferences  Json    @default("{}")
+  xp           Int     @default(0)
+  level        Int     @default(1)
+
+  emailVerifiedAt       DateTime?
+  lastLoginAt           DateTime?
+  failedLoginAttempts   Int       @default(0)
+  lockedUntil           DateTime?
+  passwordResetToken    String?
+  passwordResetExpiresAt DateTime?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -102,10 +109,28 @@ model User {
   taskComments  TaskComment[]
   activities    Activity[]
   studyBlocks   StudyBlock[]
+  sessions      Session[]
+  analyticsSnapshots AnalyticsSnapshot[]
 
-  @@index([clerkId])
   @@index([email])
   @@index([deletedAt])
+}
+
+model Session {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
 }
 
 model Workspace {
@@ -129,6 +154,7 @@ model Workspace {
   habits      Habit[]
   activities  Activity[]
   studyBlocks StudyBlock[]
+  analyticsSnapshots AnalyticsSnapshot[]
 
   @@index([slug])
   @@index([inviteCode])
@@ -284,9 +310,10 @@ model Task {
   aiSummary String?                      @db.Text
   embedding Unsupported("vector(1536)")?
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  completedAt DateTime?
 
   @@index([workspaceId])
   @@index([creatorId])
@@ -454,4 +481,27 @@ model StudyBlock {
   @@index([projectId])
   @@index([userId])
   @@index([status])
+}
+
+// ─── Analytics & Productivity Models ────────────────────────
+model AnalyticsSnapshot {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String
+  
+  date        DateTime // The start of the aggregation period (e.g. daily)
+  period      String   @default("DAILY") // e.g., DAILY, WEEKLY, MONTHLY
+  
+  productivityScore Int      @default(0)
+  metrics           Json     @default("{}") // Store breakdown (tasks completed, habits, focus time)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId, date, period])
+  @@index([workspaceId, date])
+  @@index([userId, date])
 }

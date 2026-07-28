@@ -4,6 +4,7 @@ import { QuickAddButton } from './QuickAddButton';
 import { SearchTrigger } from './SearchTrigger';
 import { UserMenu } from './UserMenu';
 import { ConnectionStatus } from './ConnectionStatus';
+import { useAuth } from '@/lib/auth-hooks';
 
 interface TopBarProps {
   breadcrumbs: BreadcrumbItem[];
@@ -20,6 +21,8 @@ export function TopBar({
   onSearch,
   onQuickAdd,
 }: TopBarProps) {
+  const { user } = useAuth();
+
   return (
     <header className="sticky top-0 z-30 border-b border-border/70 bg-background/70 backdrop-blur-xl">
       <div className="flex items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
@@ -45,9 +48,9 @@ export function TopBar({
           </div>
           <div className="hidden lg:block">
             <UserMenu
-              name="Saira Khan"
+              name={user?.displayName || 'User'}
               role={workspace.role}
-              email="saira@orbit.app"
+              email={user?.email || ''}
               workspaceSlug={workspaceSlug}
             />
           </div>

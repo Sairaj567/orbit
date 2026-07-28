@@ -24,7 +24,7 @@ const RealtimeContext = createContext<RealtimeContextValue>({
 });
 
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
-  const { getToken, isSignedIn } = useAuth();
+  const { isSignedIn } = useAuth();
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const { currentWorkspaceId } = useWorkspaceStore();
@@ -40,18 +40,19 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    let currentSocket: Socket | null = null;
+    if (socket) {
+      return; // Already initialized for this session
+    }
+
     let isActive = true;
+    let newSocket: Socket | null = null;
 
-    const initSocket = async () => {
+    const initSocket = () => {
       try {
-        const token = await getToken();
-        if (!token || !isActive) return;
-
         const wsUrl = env.wsUrl || env.apiUrl || window.location.origin;
 
-        const newSocket = io(wsUrl, {
-          auth: { token },
+        newSocket = io(wsUrl, {
+          withCredentials: true,
           transports: ['websocket'],
           reconnection: true,
           reconnectionAttempts: Infinity,
@@ -69,7 +70,6 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
         if (isActive) {
           setSocket(newSocket);
-          currentSocket = newSocket;
         } else {
           newSocket.disconnect();
         }
@@ -82,11 +82,11 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       isActive = false;
-      if (currentSocket) {
-        currentSocket.disconnect();
+      if (newSocket) {
+        newSocket.disconnect();
       }
     };
-  }, [isSignedIn, getToken, socket]);
+  }, [isSignedIn]);
 
   // Join rooms based on current workspace/project
   useEffect(() => {

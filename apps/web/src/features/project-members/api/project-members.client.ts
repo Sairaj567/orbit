@@ -11,11 +11,7 @@ export interface ProjectMember {
 }
 
 export class ProjectMembersClient {
-  static async getMembers(
-    workspaceId: string,
-    projectId: string,
-    token: string,
-  ): Promise<ProjectMember[]> {
+  static async getMembers(workspaceId: string, projectId: string): Promise<ProjectMember[]> {
     const res = await apiClient<ApiResponse<ProjectMember[]>>(
       `/api/v1/workspaces/${workspaceId}/projects/${projectId}/members`,
       { method: 'GET', headers: { Authorization: `Bearer ${token}` } },
@@ -28,7 +24,6 @@ export class ProjectMembersClient {
     projectId: string,
     workspaceMemberId: string,
     role: 'VIEWER' | 'EDITOR' | 'OWNER',
-    token: string,
   ): Promise<ProjectMember> {
     const res = await apiClient<ApiResponse<ProjectMember>>(
       `/api/v1/workspaces/${workspaceId}/projects/${projectId}/members`,
@@ -46,7 +41,6 @@ export class ProjectMembersClient {
     projectId: string,
     memberId: string,
     role: 'VIEWER' | 'EDITOR' | 'OWNER',
-    token: string,
   ): Promise<ProjectMember> {
     const res = await apiClient<ApiResponse<ProjectMember>>(
       `/api/v1/workspaces/${workspaceId}/projects/${projectId}/members/${memberId}`,
@@ -63,7 +57,6 @@ export class ProjectMembersClient {
     workspaceId: string,
     projectId: string,
     memberId: string,
-    token: string,
   ): Promise<{ id: string }> {
     const res = await apiClient<ApiResponse<{ id: string }>>(
       `/api/v1/workspaces/${workspaceId}/projects/${projectId}/members/${memberId}`,

@@ -1,12 +1,12 @@
 import { Controller, Get, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { ActivityService } from './activity.service';
-import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
+import { SessionAuthGuard } from '../auth/guards/session-auth.guard';
 import { WorkspaceMembershipGuard } from '../auth/guards/workspace-membership.guard';
 import { AuthenticatedRequest } from '../auth/types';
 import { WorkspaceId } from '../common/decorators/workspace-id.decorator';
 
 @Controller('workspaces/:workspaceId')
-@UseGuards(ClerkAuthGuard, WorkspaceMembershipGuard)
+@UseGuards(SessionAuthGuard, WorkspaceMembershipGuard)
 export class ActivityController {
   constructor(private readonly activityService: ActivityService) {}
 

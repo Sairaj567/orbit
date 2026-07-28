@@ -19,32 +19,51 @@ export class ProjectPermissionsService {
       throw new ForbiddenException('You are not a member of this workspace');
     }
 
-    const projectMember = await this.prisma.projectMember.findUnique({
-      where: {
-        projectId_workspaceMemberId: {
-          projectId,
-          workspaceMemberId: workspaceMember.id,
-        },
-      },
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
       include: {
-        project: true,
+        members: {
+          where: { workspaceMemberId: workspaceMember.id },
+        },
       },
     });
 
-    if (!projectMember) {
-      throw new ForbiddenException('You do not have access to this project');
+    if (!project) {
+      throw new ForbiddenException('Project not found');
     }
 
-    if (projectMember.project.workspaceId !== workspaceId) {
+    if (project.workspaceId !== workspaceId) {
       throw new ForbiddenException('Project does not belong to this workspace');
     }
 
+    const projectMember = project.members[0];
     const roleOrder = { VIEWER: 0, EDITOR: 1, OWNER: 2 };
-    if (roleOrder[projectMember.role] < roleOrder[minRole]) {
-      throw new ForbiddenException(`You need at least ${minRole} access`);
+
+    // Explicit project member check
+    if (projectMember && roleOrder[projectMember.role] >= roleOrder[minRole]) {
+      return projectMember;
     }
 
-    return projectMember;
+    // Fallback to visibility semantics if only VIEWER access is required
+    if (minRole === 'VIEWER') {
+      if (project.visibility === 'WORKSPACE') {
+        return null;
+      }
+
+      if (project.visibility === 'ASSIGNEES') {
+        const hasTaskAssigned = await this.prisma.taskAssignee.findFirst({
+          where: {
+            userId: userId,
+            task: { projectId },
+          },
+        });
+        if (hasTaskAssigned) {
+          return null;
+        }
+      }
+    }
+
+    throw new ForbiddenException(`You need at least ${minRole} access`);
   }
 
   async requireWorkspaceRole(

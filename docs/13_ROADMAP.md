@@ -46,11 +46,11 @@ Completion of a foundation is not a production-readiness claim. The following ph
 - Notes/Resources: selectors, server search/metadata, accessible and safe presentation.
 - Invitations: delivery, acceptance, expiration, revocation, and pending-member linking.
 
-## Phase 5 — Data-backed insights
+## Phase 5 — Data-backed insights (Completed)
 
 - Replace analytics fallback/mock data with historical, permission-safe aggregation.
 
-## Phase 6 — Deployment and operations
+## Phase 6 — Deployment and operations (Completed)
 
 - Production app orchestration, controlled migrations, secret management, observability, backups, restore testing, deployment/rollback pipeline.
 

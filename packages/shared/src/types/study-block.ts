@@ -39,4 +39,8 @@ export interface StudyBlockDTO {
   notes: string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
+  project?: {
+    id: string;
+    name: string;
+  };
 }

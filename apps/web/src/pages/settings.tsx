@@ -4,12 +4,12 @@ import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useUser } from '@/lib/auth-hooks';
+import { useAuth } from '@/lib/auth-hooks';
 import { useThemeStore } from '@/stores/theme.store';
 import { useUserProfile, useUpdateUserProfile } from '@/features/users/api/use-user-profile';
 
 export function SettingsPage() {
-  const { user: clerkUser } = useUser();
+  const { user } = useAuth();
   const { data: userProfileResponse, isLoading: isProfileLoading } = useUserProfile();
   const updateUserProfile = useUpdateUserProfile();
   const { theme, setTheme } = useThemeStore();
@@ -24,11 +24,11 @@ export function SettingsPage() {
     if (userProfile) {
       setDisplayName(userProfile.displayName || '');
       setTimezone(userProfile.timezone || 'UTC');
-    } else if (clerkUser) {
-      setDisplayName(clerkUser.fullName || clerkUser.firstName || 'Orbit User');
-      setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+    } else if (user) {
+      setDisplayName(user.displayName || 'Orbit User');
+      setTimezone(user.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
     }
-  }, [userProfile, clerkUser]);
+  }, [userProfile, user]);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,15 +71,11 @@ export function SettingsPage() {
 
             <div className="grid gap-2">
               <label htmlFor="email" className="text-sm font-medium text-foreground">
-                Primary Email (Clerk Managed)
+                Primary Email
               </label>
               <Input
                 id="email"
-                value={
-                  userProfile?.email ||
-                  clerkUser?.primaryEmailAddress?.emailAddress ||
-                  'user@example.com'
-                }
+                value={userProfile?.email || user?.email || 'user@example.com'}
                 disabled
                 className="bg-muted opacity-75 cursor-not-allowed"
               />

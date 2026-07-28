@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { NotesService } from './notes.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
+import { SessionAuthGuard } from '../auth/guards/session-auth.guard';
 import { WorkspaceMembershipGuard } from '../auth/guards/workspace-membership.guard';
 import { WorkspaceId } from '../common/decorators/workspace-id.decorator';
 import {
@@ -23,7 +23,7 @@ import {
 } from '@orbit/shared';
 
 @Controller('workspaces/:workspaceId/notes')
-@UseGuards(ClerkAuthGuard, WorkspaceMembershipGuard)
+@UseGuards(SessionAuthGuard, WorkspaceMembershipGuard)
 export class NotesController {
   constructor(private readonly notesService: NotesService) {}
 

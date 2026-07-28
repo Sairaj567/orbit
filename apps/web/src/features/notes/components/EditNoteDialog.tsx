@@ -16,10 +16,10 @@ interface EditNoteDialogProps {
 export function EditNoteDialog({ workspaceId, note, open, onOpenChange }: EditNoteDialogProps) {
   const { mutate: updateNote, isPending } = useUpdateNote(workspaceId);
 
-  const handleSave = (title: string, content: string) => {
+  const handleSave = (title: string, content: string, newProjectId: string) => {
     if (!note) return;
     updateNote(
-      { id: note.id, data: { title, content } },
+      { id: note.id, data: { title, content, projectId: newProjectId } },
       {
         onSuccess: () => {
           onOpenChange(false);
@@ -42,6 +42,7 @@ export function EditNoteDialog({ workspaceId, note, open, onOpenChange }: EditNo
             <NoteEditor
               initialTitle={note.title}
               initialContent={note.content}
+              initialProjectId={note.projectId}
               onSave={handleSave}
               onCancel={() => onOpenChange(false)}
               isSaving={isPending}

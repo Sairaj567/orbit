@@ -116,9 +116,21 @@ export class DashboardService {
       tasksScore + habitsScore + focusScore + consistencyScore,
     );
 
+    const workspaceMember = await this.prisma.workspaceMember.findFirst({
+      where: { workspaceId, userId, status: 'ACTIVE' },
+    });
+
     // Recent Projects
     const recentProjects = await this.prisma.project.findMany({
-      where: { workspaceId },
+      where: {
+        workspaceId,
+        ...(workspaceMember && {
+          OR: [
+            { visibility: 'WORKSPACE' },
+            { members: { some: { workspaceMemberId: workspaceMember.id } } },
+          ],
+        }),
+      },
       orderBy: { updatedAt: 'desc' },
       take: 4,
       include: {

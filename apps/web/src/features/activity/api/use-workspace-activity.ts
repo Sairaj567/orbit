@@ -1,7 +1,7 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
+import { queryKeys } from '@/lib/query-keys';
 import type { Activity } from '@orbit/shared';
-import { useAuth } from '@/lib/auth-hooks';
 
 interface UseWorkspaceActivityOptions {
   workspaceId: string;
@@ -9,11 +9,9 @@ interface UseWorkspaceActivityOptions {
 }
 
 export function useWorkspaceActivity({ workspaceId, limit = 20 }: UseWorkspaceActivityOptions) {
-  const { getToken } = useAuth();
   return useInfiniteQuery({
-    queryKey: ['workspaces', workspaceId, 'activity'],
+    queryKey: queryKeys.workspaces.activity(workspaceId),
     queryFn: async ({ pageParam }) => {
-      const token = await getToken();
       const res = await apiClient<{ data: Activity[]; meta?: { nextCursor?: string } }>(
         `/api/v1/workspaces/${workspaceId}/activity`,
         {
@@ -21,9 +19,6 @@ export function useWorkspaceActivity({ workspaceId, limit = 20 }: UseWorkspaceAc
           params: {
             limit,
             cursor: pageParam,
-          },
-          headers: {
-            Authorization: `Bearer ${token}`,
           },
         },
       );

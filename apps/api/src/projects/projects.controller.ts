@@ -21,7 +21,7 @@ import {
   projectQuerySchema,
 } from '@orbit/shared';
 import { WorkspaceRole } from '@prisma/client';
-import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
+import { SessionAuthGuard } from '../auth/guards/session-auth.guard';
 import { WorkspaceMembershipGuard } from '../auth/guards/workspace-membership.guard';
 import { WorkspaceRoles } from '../auth/decorators/workspace-roles.decorator';
 import { AuthenticatedRequest } from '../auth/types';
@@ -29,7 +29,7 @@ import { WorkspaceId } from '../common/decorators/workspace-id.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 
 @Controller('workspaces/:workspaceId/projects')
-@UseGuards(ClerkAuthGuard, WorkspaceMembershipGuard)
+@UseGuards(SessionAuthGuard, WorkspaceMembershipGuard)
 export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
 

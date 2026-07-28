@@ -6,7 +6,7 @@ import {
   CreateWorkspaceInput,
   UpdateWorkspaceInput,
 } from '@orbit/shared';
-import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
+import { SessionAuthGuard } from '../auth/guards/session-auth.guard';
 import { WorkspaceMembershipGuard } from '../auth/guards/workspace-membership.guard';
 import { WorkspaceRoles } from '../auth/decorators/workspace-roles.decorator';
 import { WorkspaceId } from '../common/decorators/workspace-id.decorator';
@@ -14,7 +14,7 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { AuthenticatedRequest } from '../auth/types';
 
 @Controller('workspaces')
-@UseGuards(ClerkAuthGuard)
+@UseGuards(SessionAuthGuard)
 export class WorkspacesController {
   constructor(private readonly workspacesService: WorkspacesService) {}
 

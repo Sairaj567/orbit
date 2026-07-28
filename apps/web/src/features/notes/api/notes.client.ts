@@ -11,7 +11,6 @@ export const NotesClient = {
   findAll: async (
     workspaceId: string,
     query: NoteQueryInput = {},
-    token: string,
   ): Promise<ApiResponse<Note[]>> => {
     return apiClient<ApiResponse<Note[]>>(`/api/v1/workspaces/${workspaceId}/notes`, {
       method: 'GET',
@@ -22,7 +21,7 @@ export const NotesClient = {
     });
   },
 
-  findOne: async (workspaceId: string, id: string, token: string): Promise<ApiResponse<Note>> => {
+  findOne: async (workspaceId: string, id: string): Promise<ApiResponse<Note>> => {
     return apiClient<ApiResponse<Note>>(`/api/v1/workspaces/${workspaceId}/notes/${id}`, {
       method: 'GET',
       headers: {
@@ -31,11 +30,7 @@ export const NotesClient = {
     });
   },
 
-  create: async (
-    workspaceId: string,
-    data: CreateNoteInput,
-    token: string,
-  ): Promise<ApiResponse<Note>> => {
+  create: async (workspaceId: string, data: CreateNoteInput): Promise<ApiResponse<Note>> => {
     return apiClient<ApiResponse<Note>>(`/api/v1/workspaces/${workspaceId}/notes`, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -49,7 +44,6 @@ export const NotesClient = {
     workspaceId: string,
     id: string,
     data: UpdateNoteInput,
-    token: string,
   ): Promise<ApiResponse<Note>> => {
     return apiClient<ApiResponse<Note>>(`/api/v1/workspaces/${workspaceId}/notes/${id}`, {
       method: 'PATCH',
@@ -60,7 +54,7 @@ export const NotesClient = {
     });
   },
 
-  delete: async (workspaceId: string, id: string, token: string): Promise<void> => {
+  delete: async (workspaceId: string, id: string): Promise<void> => {
     await apiClient(`/api/v1/workspaces/${workspaceId}/notes/${id}`, {
       method: 'DELETE',
       headers: {

@@ -8,6 +8,7 @@ export type ActivityEntityType =
   | 'NOTE'
   | 'RESOURCE'
   | 'MEMBER'
+  | 'PROJECT_MEMBER'
   | 'WORKSPACE'
   | 'HABIT'
   | 'STUDY_BLOCK';
@@ -21,7 +22,8 @@ export type ActivityAction =
   | 'INVITED'
   | 'JOINED'
   | 'REMOVED'
-  | 'UNCOMPLETED';
+  | 'UNCOMPLETED'
+  | 'ROLE_UPDATED';
 
 export interface Activity {
   id: string;

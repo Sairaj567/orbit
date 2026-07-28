@@ -2,22 +2,40 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { WorkspaceRole } from '@orbit/shared';
 import { MembersClient } from '@/api/members.client';
 import { useWorkspaceContext } from '@/components/layout/workspace-context';
-import { useAuth } from '@/lib/auth-hooks';
-
-export const membersKeys = {
-  all: (workspaceId: string) => ['members', workspaceId] as const,
-};
+import { queryKeys } from '@/lib/query-keys';
+import { useRealtime } from '@/providers/realtime-provider';
+import { useEffect } from 'react';
 
 export function useMembers() {
   const { workspace } = useWorkspaceContext();
   const workspaceId = workspace?.slug;
-  const { getToken } = useAuth();
+  const { subscribe } = useRealtime();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!workspaceId) return;
+
+    const unsubCreated = subscribe('member.created', () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.members.all(workspaceId) });
+    });
+    const unsubUpdated = subscribe('member.updated', () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.members.all(workspaceId) });
+    });
+    const unsubDeleted = subscribe('member.deleted', () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.members.all(workspaceId) });
+    });
+
+    return () => {
+      unsubCreated();
+      unsubUpdated();
+      unsubDeleted();
+    };
+  }, [workspaceId, subscribe, queryClient]);
 
   return useQuery({
-    queryKey: membersKeys.all(workspaceId ?? ''),
+    queryKey: queryKeys.members.all(workspaceId ?? ''),
     queryFn: async () => {
-      const token = await getToken();
-      return MembersClient.findAll(workspaceId!, token!);
+      return MembersClient.findAll(workspaceId!);
     },
     enabled: !!workspaceId,
   });
@@ -27,16 +45,14 @@ export function useInviteMember() {
   const queryClient = useQueryClient();
   const { workspace } = useWorkspaceContext();
   const workspaceId = workspace?.slug;
-  const { getToken } = useAuth();
 
   return useMutation({
     mutationFn: async (payload: { email: string; role: WorkspaceRole }) => {
-      const token = await getToken();
-      return MembersClient.invite(workspaceId!, payload, token!);
+      return MembersClient.invite(workspaceId!, payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: membersKeys.all(workspaceId ?? ''),
+        queryKey: queryKeys.members.all(workspaceId ?? ''),
       });
     },
   });
@@ -46,16 +62,14 @@ export function useUpdateMemberRole() {
   const queryClient = useQueryClient();
   const { workspace } = useWorkspaceContext();
   const workspaceId = workspace?.slug;
-  const { getToken } = useAuth();
 
   return useMutation({
     mutationFn: async ({ memberId, role }: { memberId: string; role: WorkspaceRole }) => {
-      const token = await getToken();
-      return MembersClient.updateRole(workspaceId!, memberId, { role }, token!);
+      return MembersClient.updateRole(workspaceId!, memberId, { role });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: membersKeys.all(workspaceId ?? ''),
+        queryKey: queryKeys.members.all(workspaceId ?? ''),
       });
     },
   });
@@ -65,16 +79,14 @@ export function useRemoveMember() {
   const queryClient = useQueryClient();
   const { workspace } = useWorkspaceContext();
   const workspaceId = workspace?.slug;
-  const { getToken } = useAuth();
 
   return useMutation({
     mutationFn: async (memberId: string) => {
-      const token = await getToken();
-      return MembersClient.remove(workspaceId!, memberId, token!);
+      return MembersClient.remove(workspaceId!, memberId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: membersKeys.all(workspaceId ?? ''),
+        queryKey: queryKeys.members.all(workspaceId ?? ''),
       });
     },
   });

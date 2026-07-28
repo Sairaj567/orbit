@@ -5,7 +5,6 @@ const logger = new Logger('EnvValidation');
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  AUTH_MODE: z.enum(['clerk', 'dev_bypass']).default('clerk'),
   PORT: z
     .string()
     .optional()
@@ -27,9 +26,7 @@ const envSchema = z.object({
 
   CORS_ORIGIN: z.string().optional(),
 
-  CLERK_SECRET_KEY: z.string().optional(),
-  CLERK_PUBLISHABLE_KEY: z.string().optional(),
-  CLERK_WEBHOOK_SECRET: z.string().optional(),
+  SESSION_SECRET: z.string().optional(),
 
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_MODEL: z.string().default('gpt-4o-mini'),
@@ -61,24 +58,10 @@ export function validateEnv(config: Record<string, unknown>): Record<string, unk
 
   // Strict Production Enforcement Rules
   if (isProd) {
-    // HARD SAFETY RAIL: dev_bypass must NEVER run in production
-    if (parsed.AUTH_MODE === 'dev_bypass') {
-      const message =
-        '[FATAL] AUTH_MODE=dev_bypass is FORBIDDEN when NODE_ENV=production. Aborting process.';
-      logger.error(message);
-      throw new Error(message);
-    }
-
     const missingProdSecrets: string[] = [];
 
-    if (!parsed.CLERK_SECRET_KEY || parsed.CLERK_SECRET_KEY.trim() === '') {
-      missingProdSecrets.push('CLERK_SECRET_KEY');
-    }
-    if (!parsed.CLERK_PUBLISHABLE_KEY || parsed.CLERK_PUBLISHABLE_KEY.trim() === '') {
-      missingProdSecrets.push('CLERK_PUBLISHABLE_KEY');
-    }
-    if (!parsed.CLERK_WEBHOOK_SECRET || parsed.CLERK_WEBHOOK_SECRET.trim() === '') {
-      missingProdSecrets.push('CLERK_WEBHOOK_SECRET');
+    if (!parsed.SESSION_SECRET || parsed.SESSION_SECRET.trim() === '') {
+      missingProdSecrets.push('SESSION_SECRET');
     }
     if (!parsed.REDIS_URL || parsed.REDIS_URL.trim() === '') {
       missingProdSecrets.push('REDIS_URL');
@@ -95,26 +78,12 @@ export function validateEnv(config: Record<string, unknown>): Record<string, unk
       throw new Error(message);
     }
   } else {
-    // Non-production warning for missing auth/integration keys
+    // Non-production warning for missing integrations
     const missingOptional: string[] = [];
-    if (!parsed.CLERK_SECRET_KEY) missingOptional.push('CLERK_SECRET_KEY');
-    if (!parsed.CLERK_WEBHOOK_SECRET) missingOptional.push('CLERK_WEBHOOK_SECRET');
     if (!parsed.OPENAI_API_KEY) missingOptional.push('OPENAI_API_KEY');
 
     if (missingOptional.length > 0) {
       logger.warn(`Dev mode optional environment variables not set: ${missingOptional.join(', ')}`);
-    }
-
-    // Loud startup warning when auth is bypassed
-    if (parsed.AUTH_MODE === 'dev_bypass') {
-      logger.warn('');
-      logger.warn('╔══════════════════════════════════════════════════════════════╗');
-      logger.warn('║  ⚠️  AUTH_MODE = dev_bypass — AUTHENTICATION IS DISABLED   ║');
-      logger.warn('║                                                              ║');
-      logger.warn('║  All requests will be authenticated as dev_user_orbit.       ║');
-      logger.warn('║  DO NOT run this outside a trusted LAN.                      ║');
-      logger.warn('╚══════════════════════════════════════════════════════════════╝');
-      logger.warn('');
     }
   }
 

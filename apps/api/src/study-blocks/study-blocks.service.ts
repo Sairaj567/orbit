@@ -1,6 +1,10 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateStudyBlockInput, UpdateStudyBlockInput, CompleteStudyBlockInput } from '@orbit/shared';
+import {
+  CreateStudyBlockInput,
+  UpdateStudyBlockInput,
+  CompleteStudyBlockInput,
+} from '@orbit/shared';
 import { ActivityService } from '../activity/activity.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import { ProjectPermissionsService } from '../project-permissions/project-permissions.service';
@@ -21,6 +25,20 @@ export class StudyBlocksService {
     const existingActive = await this.findActive(workspaceId, userId);
     if (existingActive) {
       throw new BadRequestException('You already have an active study block.');
+    }
+
+    if (data.taskId) {
+      const task = await this.prisma.task.findUnique({ where: { id: data.taskId } });
+      if (!task || task.workspaceId !== workspaceId || task.projectId !== data.projectId) {
+        throw new NotFoundException('Task not found or does not belong to this project');
+      }
+    }
+
+    if (data.habitId) {
+      const habit = await this.prisma.habit.findUnique({ where: { id: data.habitId } });
+      if (!habit || habit.workspaceId !== workspaceId || habit.projectId !== data.projectId) {
+        throw new NotFoundException('Habit not found or does not belong to this project');
+      }
     }
 
     const studyBlock = await this.prisma.studyBlock.create({
@@ -66,6 +84,21 @@ export class StudyBlocksService {
     });
   }
 
+  async findHistory(workspaceId: string, userId: string, limit: number = 10) {
+    return this.prisma.studyBlock.findMany({
+      where: {
+        workspaceId,
+        userId,
+        status: { in: ['COMPLETED', 'CANCELLED'] },
+      },
+      orderBy: { endedAt: 'desc' },
+      take: limit,
+      include: {
+        project: { select: { name: true, id: true } },
+      },
+    });
+  }
+
   async findOne(workspaceId: string, userId: string, id: string) {
     const studyBlock = await this.prisma.studyBlock.findUnique({
       where: { id, workspaceId },
@@ -85,9 +118,9 @@ export class StudyBlocksService {
 
   async update(workspaceId: string, userId: string, id: string, data: UpdateStudyBlockInput) {
     const existing = await this.findOne(workspaceId, userId, id);
-    
+
     if (existing.status !== 'RUNNING') {
-        throw new BadRequestException('Cannot update a completed or cancelled study block.');
+      throw new BadRequestException('Cannot update a completed or cancelled study block.');
     }
 
     const studyBlock = await this.prisma.studyBlock.update({
@@ -111,9 +144,9 @@ export class StudyBlocksService {
 
   async complete(workspaceId: string, userId: string, id: string, data: CompleteStudyBlockInput) {
     const existing = await this.findOne(workspaceId, userId, id);
-    
+
     if (existing.status !== 'RUNNING') {
-        throw new BadRequestException('Study block is not running.');
+      throw new BadRequestException('Study block is not running.');
     }
 
     const studyBlock = await this.prisma.studyBlock.update({
@@ -146,12 +179,12 @@ export class StudyBlocksService {
 
     return studyBlock;
   }
-  
+
   async cancel(workspaceId: string, userId: string, id: string) {
     const existing = await this.findOne(workspaceId, userId, id);
-    
+
     if (existing.status !== 'RUNNING') {
-        throw new BadRequestException('Study block is not running.');
+      throw new BadRequestException('Study block is not running.');
     }
 
     const studyBlock = await this.prisma.studyBlock.update({

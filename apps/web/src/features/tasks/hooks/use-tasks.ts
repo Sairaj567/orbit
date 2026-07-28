@@ -1,41 +1,50 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@/lib/auth-hooks';
 import { TasksClient } from '../api/tasks.client';
 import type { CreateTaskInput, UpdateTaskInput, TaskQueryInput, Task } from '@orbit/shared';
 import type { PaginationMeta } from '../api/tasks.client';
-
-export const taskKeys = {
-  all: (workspaceId: string) => ['tasks', workspaceId] as const,
-  lists: (workspaceId: string) => [...taskKeys.all(workspaceId), 'list'] as const,
-  list: (workspaceId: string, query: Partial<TaskQueryInput>) =>
-    [...taskKeys.lists(workspaceId), { query }] as const,
-  details: (workspaceId: string) => [...taskKeys.all(workspaceId), 'detail'] as const,
-  detail: (workspaceId: string, id: string) => [...taskKeys.details(workspaceId), id] as const,
-};
+import { queryKeys } from '@/lib/query-keys';
+import { useRealtime } from '@/providers/realtime-provider';
+import { useEffect } from 'react';
 
 export function useTasks(workspaceId: string, query: Partial<TaskQueryInput> = {}) {
-  const { getToken } = useAuth();
+  const { subscribe } = useRealtime();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const unsubCreated = subscribe('task.created', () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all(workspaceId) });
+    });
+    const unsubUpdated = subscribe('task.updated', () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all(workspaceId) });
+    });
+    const unsubDeleted = subscribe('task.deleted', () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all(workspaceId) });
+    });
+
+    return () => {
+      unsubCreated();
+      unsubUpdated();
+      unsubDeleted();
+    };
+  }, [workspaceId, subscribe, queryClient]);
 
   return useQuery({
-    queryKey: taskKeys.list(workspaceId, query),
+    queryKey: queryKeys.tasks.list(workspaceId, query),
     queryFn: async () => {
-      const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
-      return TasksClient.findAll(workspaceId, query, token);
+      return TasksClient.findAll(workspaceId, query);
     },
     enabled: !!workspaceId,
   });
 }
 
 export function useTask(workspaceId: string, id: string) {
-  const { getToken } = useAuth();
-
   return useQuery({
-    queryKey: taskKeys.detail(workspaceId, id),
+    queryKey: queryKeys.tasks.detail(workspaceId, id),
     queryFn: async () => {
-      const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
-      return TasksClient.findOne(workspaceId, id, token);
+      return TasksClient.findOne(workspaceId, id);
     },
     enabled: !!workspaceId && !!id,
   });
@@ -43,152 +52,77 @@ export function useTask(workspaceId: string, id: string) {
 
 export function useCreateTask(workspaceId: string) {
   const queryClient = useQueryClient();
-  const { getToken } = useAuth();
 
   return useMutation({
     mutationFn: async (data: CreateTaskInput) => {
-      const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
-      return TasksClient.create(workspaceId, data, token);
+      return TasksClient.create(workspaceId, data);
     },
-    onMutate: async (newTask) => {
-      await queryClient.cancelQueries({ queryKey: taskKeys.lists(workspaceId) });
-      const previousLists = queryClient.getQueriesData({ queryKey: taskKeys.lists(workspaceId) });
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.tasks.all(workspaceId) });
 
-      queryClient.setQueriesData(
-        { queryKey: taskKeys.lists(workspaceId) },
-        (old: { data: Task[]; meta: PaginationMeta } | undefined) => {
-          if (!old || !old.data) return old;
-          const optimisticTask = {
-            id: `temp-${Date.now()}`,
-            ...newTask,
-            status: newTask.status || 'TODO',
-            priority: newTask.priority || 'MEDIUM',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            workspaceId,
-            tags: newTask.tags || [],
-          };
-          return {
-            ...old,
-            data: [optimisticTask, ...old.data],
-            meta: { ...old.meta, total: (old.meta?.total || 0) + 1 },
-          };
-        },
-      );
-      return { previousLists };
-    },
-    onError: (_err, _newTask, context) => {
-      if (context?.previousLists) {
-        context.previousLists.forEach(([queryKey, data]) => {
-          queryClient.setQueryData(queryKey, data);
-        });
-      }
+      // Basic optimistic update if needed could be added here
+      // Realtime events will also handle the final update
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: taskKeys.lists(workspaceId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all(workspaceId) });
     },
   });
 }
 
 export function useUpdateTask(workspaceId: string) {
   const queryClient = useQueryClient();
-  const { getToken } = useAuth();
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateTaskInput }) => {
-      const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
-      return TasksClient.update(workspaceId, id, data, token);
+      return TasksClient.update(workspaceId, id, data);
     },
     onMutate: async ({ id, data }) => {
-      await queryClient.cancelQueries({ queryKey: taskKeys.detail(workspaceId, id) });
-      await queryClient.cancelQueries({ queryKey: taskKeys.lists(workspaceId) });
+      await queryClient.cancelQueries({ queryKey: queryKeys.tasks.detail(workspaceId, id) });
+      await queryClient.cancelQueries({ queryKey: queryKeys.tasks.all(workspaceId) });
 
-      const previousDetail = queryClient.getQueryData(taskKeys.detail(workspaceId, id));
-      const previousLists = queryClient.getQueriesData({ queryKey: taskKeys.lists(workspaceId) });
+      const previousDetail = queryClient.getQueryData(queryKeys.tasks.detail(workspaceId, id));
 
       if (previousDetail) {
-        queryClient.setQueryData(taskKeys.detail(workspaceId, id), {
+        queryClient.setQueryData(queryKeys.tasks.detail(workspaceId, id), {
           ...(previousDetail as Task),
           ...data,
           updatedAt: new Date().toISOString(),
         });
       }
 
-      queryClient.setQueriesData(
-        { queryKey: taskKeys.lists(workspaceId) },
-        (old: { data: Task[]; meta: PaginationMeta } | undefined) => {
-          if (!old || !old.data) return old;
-          return {
-            ...old,
-            data: old.data.map((task: Task) => (task.id === id ? { ...task, ...data } : task)),
-          };
-        },
-      );
-
-      return { previousDetail, previousLists };
+      return { previousDetail };
     },
     onError: (_err, _variables, context) => {
       if (context?.previousDetail) {
         queryClient.setQueryData(
-          taskKeys.detail(workspaceId, _variables.id),
+          queryKeys.tasks.detail(workspaceId, _variables.id),
           context.previousDetail,
         );
       }
-      if (context?.previousLists) {
-        context.previousLists.forEach(([queryKey, data]) => {
-          queryClient.setQueryData(queryKey, data);
-        });
-      }
     },
     onSettled: (_, __, variables) => {
-      queryClient.invalidateQueries({ queryKey: taskKeys.detail(workspaceId, variables.id) });
-      queryClient.invalidateQueries({ queryKey: taskKeys.lists(workspaceId) });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.tasks.detail(workspaceId, variables.id),
+      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all(workspaceId) });
     },
   });
 }
 
 export function useDeleteTask(workspaceId: string) {
   const queryClient = useQueryClient();
-  const { getToken } = useAuth();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
-      return TasksClient.remove(workspaceId, id, token);
+      return TasksClient.remove(workspaceId, id);
     },
     onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: taskKeys.detail(workspaceId, id) });
-      await queryClient.cancelQueries({ queryKey: taskKeys.lists(workspaceId) });
-
-      const previousLists = queryClient.getQueriesData({ queryKey: taskKeys.lists(workspaceId) });
-
-      queryClient.setQueriesData(
-        { queryKey: taskKeys.lists(workspaceId) },
-        (old: { data: Task[]; meta: PaginationMeta } | undefined) => {
-          if (!old || !old.data) return old;
-          return {
-            ...old,
-            data: old.data.filter((task: Task) => task.id !== id),
-            meta: { ...old.meta, total: Math.max(0, (old.meta?.total || 0) - 1) },
-          };
-        },
-      );
-
-      return { previousLists };
-    },
-    onError: (_err, _id, context) => {
-      if (context?.previousLists) {
-        context.previousLists.forEach(([queryKey, data]) => {
-          queryClient.setQueryData(queryKey, data);
-        });
-      }
+      await queryClient.cancelQueries({ queryKey: queryKeys.tasks.detail(workspaceId, id) });
+      await queryClient.cancelQueries({ queryKey: queryKeys.tasks.all(workspaceId) });
     },
     onSettled: (_, __, id) => {
-      queryClient.removeQueries({ queryKey: taskKeys.detail(workspaceId, id) });
-      queryClient.invalidateQueries({ queryKey: taskKeys.lists(workspaceId) });
+      queryClient.removeQueries({ queryKey: queryKeys.tasks.detail(workspaceId, id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all(workspaceId) });
     },
   });
 }

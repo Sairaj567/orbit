@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Note } from '@orbit/shared';
+import { useEffect } from 'react';
 
 export function NotesPage() {
   const { workspace } = useWorkspaceContext();
@@ -20,22 +21,24 @@ export function NotesPage() {
   const projects = projectsData?.data || [];
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
   const [createOpen, setCreateOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [deletingNote, setDeletingNote] = useState<Note | null>(null);
 
-  const { data: notesData, isLoading } = useNotes(workspace.slug);
+  const { data: notesData, isLoading } = useNotes(workspace.slug, {
+    search: debouncedSearch || undefined,
+  });
 
-  const rawNotes = notesData?.data || [];
-  const notes = searchQuery
-    ? rawNotes.filter(
-        (n) =>
-          n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          n.content.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : rawNotes;
+  const notes = notesData?.data || [];
 
-  const defaultProjectId = projects.length > 0 ? (projects[0]?.id || '') : '';
+  const defaultProjectId = projects.length > 0 ? projects[0]?.id || '' : '';
 
   const pinnedNotes = notes.filter((n) => n.isPinned);
   const unpinnedNotes = notes.filter((n) => !n.isPinned);
@@ -75,7 +78,11 @@ export function NotesPage() {
         <EmptyState
           icon={<NotebookPen className="h-6 w-6" aria-hidden="true" />}
           title="No notes found"
-          description={searchQuery ? 'No notes match your search query.' : 'Create your first note to capture ideas, meeting minutes, or specs.'}
+          description={
+            searchQuery
+              ? 'No notes match your search query.'
+              : 'Create your first note to capture ideas, meeting minutes, or specs.'
+          }
           action={
             defaultProjectId && !searchQuery ? (
               <Button onClick={() => setCreateOpen(true)}>
@@ -150,4 +157,3 @@ export function NotesPage() {
     </div>
   );
 }
-

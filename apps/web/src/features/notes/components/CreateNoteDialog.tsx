@@ -22,9 +22,9 @@ export function CreateNoteDialog({
 }: CreateNoteDialogProps) {
   const { mutate: createNote, isPending } = useCreateNote(workspaceId);
 
-  const handleSave = (title: string, content: string) => {
+  const handleSave = (title: string, content: string, newProjectId: string) => {
     createNote(
-      { title, content, projectId, taskId, isPinned: false },
+      { title, content, projectId: newProjectId, taskId, isPinned: false },
       {
         onSuccess: () => {
           onOpenChange(false);
@@ -43,6 +43,7 @@ export function CreateNoteDialog({
         <div className="flex-1 mt-4">
           <Suspense fallback={<Skeleton className="h-48 w-full rounded-xl" />}>
             <NoteEditor
+              initialProjectId={projectId}
               onSave={handleSave}
               onCancel={() => onOpenChange(false)}
               isSaving={isPending}

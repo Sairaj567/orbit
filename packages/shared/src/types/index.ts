@@ -12,3 +12,4 @@ export * from './realtime.js';
 export * from './dashboard.js';
 export * from './ai.js';
 export * from './activity.js';
+export * from './category.js';

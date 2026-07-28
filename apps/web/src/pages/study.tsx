@@ -8,6 +8,7 @@ import {
   useCreateStudyBlock,
   useCompleteStudyBlock,
   useCancelStudyBlock,
+  useStudyBlocksHistory,
 } from '@/features/study-blocks/hooks/use-study-blocks';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -28,6 +29,8 @@ export function StudyPage() {
   const [notesText, setNotesText] = useState<string>('');
 
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  const { data: history } = useStudyBlocksHistory();
 
   useEffect(() => {
     if (!activeBlock) return;
@@ -120,7 +123,12 @@ export function StudyPage() {
 
                 {projects.length > 0 && (
                   <div className="space-y-2">
-                    <label htmlFor="study-project" className="text-xs font-medium text-muted-foreground">Select Project</label>
+                    <label
+                      htmlFor="study-project"
+                      className="text-xs font-medium text-muted-foreground"
+                    >
+                      Select Project
+                    </label>
                     <select
                       id="study-project"
                       value={selectedProjectId}
@@ -195,9 +203,16 @@ export function StudyPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="text-xs text-muted-foreground space-y-2">
-              <p>• <strong>25 min focus</strong>: Eliminates distractions and boosts mental sharpness.</p>
-              <p>• <strong>5 min break</strong>: Step away, stretch, and hydrate after each block.</p>
-              <p>• <strong>XP Boost</strong>: Completing study sessions awards productivity XP!</p>
+              <p>
+                • <strong>25 min focus</strong>: Eliminates distractions and boosts mental
+                sharpness.
+              </p>
+              <p>
+                • <strong>5 min break</strong>: Step away, stretch, and hydrate after each block.
+              </p>
+              <p>
+                • <strong>XP Boost</strong>: Completing study sessions awards productivity XP!
+              </p>
             </CardContent>
           </Card>
 
@@ -223,6 +238,52 @@ export function StudyPage() {
           </Card>
         </div>
       </div>
+
+      {/* History Section */}
+      <div className="pt-6">
+        <h3 className="text-xl font-bold tracking-tight mb-4">Recent Sessions</h3>
+        {!history || history.length === 0 ? (
+          <div className="text-muted-foreground bg-zinc-50 dark:bg-zinc-900 rounded-xl p-8 text-center border border-dashed border-border/70">
+            No focus sessions recorded yet. Start one above!
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {history.map((block) => (
+              <Card key={block.id} className="bg-card">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium flex items-center justify-between">
+                    <span>{block.project?.name || 'No Project'}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(block.startedAt).toLocaleDateString()}
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 pb-4">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Duration</span>
+                    <span className="font-semibold">
+                      {block.actualDuration || block.plannedDuration} / {block.plannedDuration} min
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Status</span>
+                    <span
+                      className={`font-semibold ${block.status === 'COMPLETED' ? 'text-emerald-500' : 'text-red-500'}`}
+                    >
+                      {block.status}
+                    </span>
+                  </div>
+                  {block.notes && (
+                    <div className="text-xs text-muted-foreground bg-muted p-2 rounded-md mt-2">
+                      {block.notes}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
-}
+}

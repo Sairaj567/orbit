@@ -77,20 +77,23 @@ export class ProjectsService {
 
     const where: Prisma.ProjectWhereInput = {
       workspaceId,
-      members: {
-        some: {
-          workspaceMemberId: workspaceMember.id,
-        },
-      },
+      OR: [
+        { visibility: 'WORKSPACE' },
+        { members: { some: { workspaceMemberId: workspaceMember.id } } },
+      ],
     };
 
     if (status) where.status = status;
     if (visibility) where.visibility = visibility;
     if (isArchived !== undefined) where.isArchived = isArchived;
     if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
+      where.AND = [
+        {
+          OR: [
+            { name: { contains: search, mode: 'insensitive' } },
+            { description: { contains: search, mode: 'insensitive' } },
+          ],
+        },
       ];
     }
 
@@ -149,7 +152,7 @@ export class ProjectsService {
     this.activityService.recordActivity({
       workspaceId,
       projectId: updatedProject.id,
-      userId: updatedProject.creatorId, // Best effort actor
+      userId,
       entityType: 'PROJECT',
       entityId: updatedProject.id,
       action: 'UPDATED',
@@ -178,7 +181,7 @@ export class ProjectsService {
     this.activityService.recordActivity({
       workspaceId,
       projectId: deletedProject.id,
-      userId: deletedProject.creatorId,
+      userId,
       entityType: 'PROJECT',
       entityId: deletedProject.id,
       action: 'DELETED',

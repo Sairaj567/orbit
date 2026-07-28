@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- **Analytics Model Implementation:** Added `AnalyticsSnapshot` model in Prisma and implemented `AnalyticsService` to perform real, period-based productivity aggregation instead of mocking it.
+- **Observability & Logging:** Added `@sentry/node` and `@sentry/react` for structured error tracking. Integrated `winston` for robust JSON logging in the API.
+- **CI/CD Expansion:** Configured GitHub Actions to run dependency scanning (`pnpm audit`) and automatically build and push Docker images to GitHub Container Registry (GHCR) upon merges to `main`.
+- **Docker Hardening:** Removed exposed ports for Postgres and Redis from `docker-compose.prod.yml`. Added Docker secrets integration for database credentials.
+- **E2E Testing:** Configured Playwright in `apps/web` for comprehensive database-backed E2E testing, including a basic core navigation test and integration with CI.
+- **Backup & Restore Strategy:** Introduced `scripts/db_backup_restore.sh` to automate database disaster recovery testing.
+
 - **Achievements & Notifications removal (2026-07-26):** Completely removed the unbacked fake UI for Achievements (`AchievementsPage`) and Notifications (`NotificationButton`, notification overlay modal, and unused `useNotificationStore`). No backend services or persistence existed for either feature. Schema fields `User.xp` and `User.level` are retained as inert defaults.
 - **Documentation correction (2026-07-26):** The draft claims immediately below are superseded by the source-verified [Feature Completeness Report](./FEATURE_COMPLETENESS_REPORT.md). They must not be read as production-completion claims.
   - Habits, Notes, Study Blocks, Calendar, Dashboard, Activity, Search, and Settings have partial or functional-but-incomplete implementations.

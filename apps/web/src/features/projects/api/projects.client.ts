@@ -12,11 +12,7 @@ import type {
 export type PaginationMeta = ApiMeta;
 
 export class ProjectsClient {
-  static async create(
-    workspaceId: string,
-    data: CreateProjectInput,
-    token: string,
-  ): Promise<Project> {
+  static async create(workspaceId: string, data: CreateProjectInput): Promise<Project> {
     const res = await apiClient<ApiResponse<Project>>(
       `/api/v1/workspaces/${workspaceId}/projects`,
       {
@@ -33,7 +29,6 @@ export class ProjectsClient {
   static async findAll(
     workspaceId: string,
     query: Partial<ProjectQueryInput>,
-    token: string,
   ): Promise<PaginatedResponse<Project>> {
     return apiClient<PaginatedResponse<Project>>(`/api/v1/workspaces/${workspaceId}/projects`, {
       method: 'GET',
@@ -44,7 +39,7 @@ export class ProjectsClient {
     });
   }
 
-  static async findOne(workspaceId: string, id: string, token: string): Promise<Project> {
+  static async findOne(workspaceId: string, id: string): Promise<Project> {
     const res = await apiClient<ApiResponse<Project>>(
       `/api/v1/workspaces/${workspaceId}/projects/${id}`,
       {
@@ -57,12 +52,7 @@ export class ProjectsClient {
     return res.data;
   }
 
-  static async update(
-    workspaceId: string,
-    id: string,
-    data: UpdateProjectInput,
-    token: string,
-  ): Promise<Project> {
+  static async update(workspaceId: string, id: string, data: UpdateProjectInput): Promise<Project> {
     const res = await apiClient<ApiResponse<Project>>(
       `/api/v1/workspaces/${workspaceId}/projects/${id}`,
       {
@@ -76,7 +66,7 @@ export class ProjectsClient {
     return res.data;
   }
 
-  static async remove(workspaceId: string, id: string, token: string): Promise<void> {
+  static async remove(workspaceId: string, id: string): Promise<void> {
     await apiClient(`/api/v1/workspaces/${workspaceId}/projects/${id}`, {
       method: 'DELETE',
       headers: {

@@ -28,6 +28,13 @@ export class NotesService {
     } else {
       await this.permissionsService.requireWorkspaceRole(workspaceId, userId, 'MEMBER');
     }
+    if (data.taskId) {
+      const task = await this.prisma.task.findUnique({ where: { id: data.taskId } });
+      if (!task || task.workspaceId !== workspaceId || task.projectId !== data.projectId) {
+        throw new NotFoundException('Task not found or does not belong to this project');
+      }
+    }
+
     const note = await this.prisma.note.create({
       data: {
         workspaceId,
@@ -97,6 +104,13 @@ export class NotesService {
       where.isPinned = String(query.isPinned) === 'true';
     }
 
+    if (query.search) {
+      where.OR = [
+        { title: { contains: query.search, mode: 'insensitive' } },
+        { content: { contains: query.search, mode: 'insensitive' } },
+      ];
+    }
+
     return this.prisma.note.findMany({
       where,
       orderBy: [{ isPinned: 'desc' }, { order: 'asc' }, { updatedAt: 'desc' }],
@@ -148,6 +162,14 @@ export class NotesService {
         );
       } else {
         await this.permissionsService.requireWorkspaceRole(workspaceId, userId, 'MEMBER');
+      }
+    }
+
+    if (data.taskId) {
+      const task = await this.prisma.task.findUnique({ where: { id: data.taskId } });
+      const targetProjectId = data.projectId !== undefined ? data.projectId : note.projectId;
+      if (!task || task.workspaceId !== workspaceId || task.projectId !== targetProjectId) {
+        throw new NotFoundException('Task not found or does not belong to this project');
       }
     }
 

@@ -3,16 +3,19 @@ services:
     image: pgvector/pgvector:pg17
     container_name: orbit-postgres
     restart: unless-stopped
-    ports:
-      - '5432:5432'
+    # Ports removed for security, only accessible inside the docker network
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-orbit}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-orbit_secret}
-      POSTGRES_DB: ${POSTGRES_DB:-orbit}
+      POSTGRES_USER_FILE: /run/secrets/db_user
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_DB_FILE: /run/secrets/db_name
+    secrets:
+      - db_user
+      - db_password
+      - db_name
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-orbit} -d ${POSTGRES_DB:-orbit}']
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -21,8 +24,7 @@ services:
     image: redis:7-alpine
     container_name: orbit-redis
     restart: unless-stopped
-    ports:
-      - '6379:6379'
+    # Ports removed for security, only accessible inside the docker network
     volumes:
       - redis_data:/data
     healthcheck:
@@ -68,3 +70,11 @@ services:
 volumes:
   postgres_data:
   redis_data:
+
+secrets:
+  db_user:
+    file: ./docker/secrets/db_user.txt
+  db_password:
+    file: ./docker/secrets/db_password.txt
+  db_name:
+    file: ./docker/secrets/db_name.txt

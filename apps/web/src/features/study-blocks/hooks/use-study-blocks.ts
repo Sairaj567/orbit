@@ -1,5 +1,4 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@/lib/auth-hooks';
 import { StudyBlocksClient } from '../api/study-blocks.client';
 import { useWorkspaceStore } from '@/stores';
 import type {
@@ -7,93 +6,114 @@ import type {
   UpdateStudyBlockInput,
   CompleteStudyBlockInput,
 } from '@orbit/shared';
-
-const QUERY_KEY = ['study-blocks', 'active'];
+import { queryKeys } from '@/lib/query-keys';
+import { useRealtime } from '@/providers/realtime-provider';
+import { useEffect } from 'react';
 
 export function useActiveStudyBlock() {
-  const { getToken } = useAuth();
+  const currentWorkspaceId = useWorkspaceStore((state) => state.currentWorkspaceId);
+  const { subscribe } = useRealtime();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!currentWorkspaceId) return;
+
+    const unsubCreated = subscribe('studyBlock.created', () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.studyBlocks.active(currentWorkspaceId) });
+    });
+    const unsubUpdated = subscribe('studyBlock.updated', () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.studyBlocks.active(currentWorkspaceId) });
+    });
+    const unsubDeleted = subscribe('studyBlock.deleted', () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.studyBlocks.active(currentWorkspaceId) });
+    });
+
+    return () => {
+      unsubCreated();
+      unsubUpdated();
+      unsubDeleted();
+    };
+  }, [currentWorkspaceId, subscribe, queryClient]);
+
+  return useQuery({
+    queryKey: currentWorkspaceId ? queryKeys.studyBlocks.active(currentWorkspaceId) : [],
+    queryFn: async () => {
+      if (!currentWorkspaceId) return null;
+      return StudyBlocksClient.getActive(currentWorkspaceId);
+    },
+    enabled: !!currentWorkspaceId,
+  });
+}
+
+export function useStudyBlocksHistory() {
   const currentWorkspaceId = useWorkspaceStore((state) => state.currentWorkspaceId);
 
   return useQuery({
-    queryKey: [...QUERY_KEY, currentWorkspaceId],
+    queryKey: currentWorkspaceId ? ['studyBlocks', 'history', currentWorkspaceId] : [],
     queryFn: async () => {
-      if (!currentWorkspaceId) return null;
-      const token = await getToken();
-      if (!token) return null;
-      return StudyBlocksClient.getActive(currentWorkspaceId, token);
+      if (!currentWorkspaceId) return [];
+      return StudyBlocksClient.getHistory(currentWorkspaceId);
     },
     enabled: !!currentWorkspaceId,
   });
 }
 
 export function useCreateStudyBlock() {
-  const { getToken } = useAuth();
   const queryClient = useQueryClient();
   const currentWorkspaceId = useWorkspaceStore((state) => state.currentWorkspaceId);
 
   return useMutation({
     mutationFn: async (data: CreateStudyBlockInput) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
-      const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
-      return StudyBlocksClient.create(currentWorkspaceId, data, token);
+      return StudyBlocksClient.create(currentWorkspaceId, data);
     },
     onSuccess: (data) => {
-      queryClient.setQueryData([...QUERY_KEY, currentWorkspaceId], data);
+      queryClient.setQueryData(queryKeys.studyBlocks.active(currentWorkspaceId!), data);
     },
   });
 }
 
 export function useUpdateStudyBlock() {
-  const { getToken } = useAuth();
   const queryClient = useQueryClient();
   const currentWorkspaceId = useWorkspaceStore((state) => state.currentWorkspaceId);
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateStudyBlockInput }) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
-      const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
-      return StudyBlocksClient.update(currentWorkspaceId, id, data, token);
+      return StudyBlocksClient.update(currentWorkspaceId, id, data);
     },
     onSuccess: (data) => {
-      queryClient.setQueryData([...QUERY_KEY, currentWorkspaceId], data);
+      queryClient.setQueryData(queryKeys.studyBlocks.active(currentWorkspaceId!), data);
     },
   });
 }
 
 export function useCompleteStudyBlock() {
-  const { getToken } = useAuth();
   const queryClient = useQueryClient();
   const currentWorkspaceId = useWorkspaceStore((state) => state.currentWorkspaceId);
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: CompleteStudyBlockInput }) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
-      const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
-      return StudyBlocksClient.complete(currentWorkspaceId, id, data, token);
+      return StudyBlocksClient.complete(currentWorkspaceId, id, data);
     },
     onSuccess: () => {
-      queryClient.setQueryData([...QUERY_KEY, currentWorkspaceId], null);
+      queryClient.setQueryData(queryKeys.studyBlocks.active(currentWorkspaceId!), null);
     },
   });
 }
 
 export function useCancelStudyBlock() {
-  const { getToken } = useAuth();
   const queryClient = useQueryClient();
   const currentWorkspaceId = useWorkspaceStore((state) => state.currentWorkspaceId);
 
   return useMutation({
     mutationFn: async (id: string) => {
       if (!currentWorkspaceId) throw new Error('No workspace selected');
-      const token = await getToken();
-      if (!token) throw new Error('Not authenticated');
-      return StudyBlocksClient.cancel(currentWorkspaceId, id, token);
+      return StudyBlocksClient.cancel(currentWorkspaceId, id);
     },
     onSuccess: () => {
-      queryClient.setQueryData([...QUERY_KEY, currentWorkspaceId], null);
+      queryClient.setQueryData(queryKeys.studyBlocks.active(currentWorkspaceId!), null);
     },
   });
 }

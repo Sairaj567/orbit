@@ -5,7 +5,8 @@ import { CreateHabitInput, UpdateHabitInput } from '@orbit/shared';
 import { ActivityService } from '../activity/activity.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import { ProjectPermissionsService } from '../project-permissions/project-permissions.service';
-import { RRule } from 'rrule';
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
+import { computeStreak } from './recalculate-streak';
 
 @Injectable()
 export class HabitsService {
@@ -66,9 +67,11 @@ export class HabitsService {
 
     const where: Prisma.HabitWhereInput = {
       workspaceId,
-      ...(projectId ? { projectId } : {
-        project: { members: { some: { workspaceMemberId: workspaceMember.id } } }
-      }),
+      ...(projectId
+        ? { projectId }
+        : {
+            project: { members: { some: { workspaceMemberId: workspaceMember.id } } },
+          }),
     };
 
     return this.prisma.habit.findMany({
@@ -86,17 +89,42 @@ export class HabitsService {
       throw new NotFoundException(`Habit with ID ${id} not found`);
     }
 
-    await this.permissionsService.requireProjectRole(workspaceId, habit.projectId, userId, 'VIEWER');
+    await this.permissionsService.requireProjectRole(
+      workspaceId,
+      habit.projectId,
+      userId,
+      'VIEWER',
+    );
 
     return habit;
   }
 
+  async getHistory(workspaceId: string, userId: string, id: string) {
+    const habit = await this.findOne(workspaceId, userId, id);
+    const completions = await this.prisma.habitCompletion.findMany({
+      where: { habitId: id },
+      orderBy: { completedAt: 'desc' },
+      take: 60,
+    });
+    return { habit, completions };
+  }
+
   async update(workspaceId: string, userId: string, id: string, data: UpdateHabitInput) {
     const existingHabit = await this.findOne(workspaceId, userId, id);
-    await this.permissionsService.requireProjectRole(workspaceId, existingHabit.projectId, userId, 'EDITOR');
+    await this.permissionsService.requireProjectRole(
+      workspaceId,
+      existingHabit.projectId,
+      userId,
+      'EDITOR',
+    );
 
     if (data.projectId && data.projectId !== existingHabit.projectId) {
-      await this.permissionsService.requireProjectRole(workspaceId, data.projectId, userId, 'EDITOR');
+      await this.permissionsService.requireProjectRole(
+        workspaceId,
+        data.projectId,
+        userId,
+        'EDITOR',
+      );
     }
 
     const habit = await this.prisma.habit.update({
@@ -137,7 +165,12 @@ export class HabitsService {
 
   async remove(workspaceId: string, userId: string, id: string) {
     const existingHabit = await this.findOne(workspaceId, userId, id);
-    await this.permissionsService.requireProjectRole(workspaceId, existingHabit.projectId, userId, 'EDITOR');
+    await this.permissionsService.requireProjectRole(
+      workspaceId,
+      existingHabit.projectId,
+      userId,
+      'EDITOR',
+    );
 
     await this.prisma.habit.delete({
       where: { id },
@@ -166,11 +199,41 @@ export class HabitsService {
 
   async toggleComplete(workspaceId: string, userId: string, id: string) {
     const existingHabit = await this.findOne(workspaceId, userId, id);
-    await this.permissionsService.requireProjectRole(workspaceId, existingHabit.projectId, userId, 'EDITOR');
+    await this.permissionsService.requireProjectRole(
+      workspaceId,
+      existingHabit.projectId,
+      userId,
+      'EDITOR',
+    );
 
+    const tz = existingHabit.timezone || 'UTC';
     const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+
+    const zonedNow = toZonedTime(now, tz);
+
+    // Calculate start and end of the day in the target timezone
+    const zonedStart = new Date(
+      zonedNow.getFullYear(),
+      zonedNow.getMonth(),
+      zonedNow.getDate(),
+      0,
+      0,
+      0,
+      0,
+    );
+    const zonedEnd = new Date(
+      zonedNow.getFullYear(),
+      zonedNow.getMonth(),
+      zonedNow.getDate(),
+      23,
+      59,
+      59,
+      999,
+    );
+
+    // Convert back to UTC
+    const todayStart = fromZonedTime(zonedStart, tz);
+    const todayEnd = fromZonedTime(zonedEnd, tz);
 
     const existingCompletion = await this.prisma.habitCompletion.findFirst({
       where: {
@@ -182,24 +245,14 @@ export class HabitsService {
       },
     });
 
-    let newStreak = existingHabit.streak;
-    let newLongestStreak = existingHabit.longestStreak;
-    let newCompletionCount = existingHabit.completionCount;
-    let newLastCompletedAt = existingHabit.lastCompletedAt;
+    let action: 'COMPLETED' | 'UNCOMPLETED';
 
     if (existingCompletion) {
       // Un-complete
       await this.prisma.habitCompletion.delete({
         where: { id: existingCompletion.id },
       });
-      newStreak = Math.max(0, existingHabit.streak - 1);
-      newCompletionCount = Math.max(0, existingHabit.completionCount - 1);
-      
-      const previousCompletion = await this.prisma.habitCompletion.findFirst({
-        where: { habitId: id },
-        orderBy: { completedAt: 'desc' },
-      });
-      newLastCompletedAt = previousCompletion ? previousCompletion.completedAt : null;
+      action = 'UNCOMPLETED';
     } else {
       // Complete
       await this.prisma.habitCompletion.create({
@@ -208,46 +261,42 @@ export class HabitsService {
           completedAt: now,
         },
       });
-      
-      newCompletionCount = existingHabit.completionCount + 1;
-      newLastCompletedAt = now;
-
-      // Basic Streak Calculation
-      if (existingHabit.rrule) {
-        try {
-          const rule = RRule.fromString(existingHabit.rrule);
-          const previousOccurrence = rule.before(now, false);
-          
-          if (existingHabit.lastCompletedAt && previousOccurrence) {
-            // Check if last completion was on or after the previous occurrence
-            if (existingHabit.lastCompletedAt >= previousOccurrence) {
-              newStreak = existingHabit.streak + 1;
-            } else {
-              newStreak = 1;
-            }
-          } else {
-            newStreak = 1;
-          }
-        } catch {
-          // Fallback if rrule parsing fails
-          newStreak = existingHabit.streak + 1;
-        }
-      } else {
-        newStreak = existingHabit.streak + 1;
-      }
-      
-      if (newStreak > newLongestStreak) {
-        newLongestStreak = newStreak;
-      }
+      action = 'COMPLETED';
     }
 
+    return this.recalculateStreak(workspaceId, userId, id, action);
+  }
+
+  async recalculateStreak(
+    workspaceId: string,
+    userId: string,
+    habitId: string,
+    action: 'COMPLETED' | 'UNCOMPLETED' | 'CREATED' | 'UPDATED' | 'DELETED',
+  ) {
+    const habit = await this.prisma.habit.findUnique({
+      where: { id: habitId },
+      include: { completions: { orderBy: { completedAt: 'asc' } } },
+    });
+
+    if (!habit) throw new NotFoundException();
+
+    const { streak, longestStreak } = computeStreak(
+      habit.completions,
+      habit.rrule,
+      habit.timezone || 'UTC',
+    );
+
+    const completionCount = habit.completions.length;
+    const lastCompletedAt =
+      completionCount > 0 ? (habit.completions[completionCount - 1]?.completedAt ?? null) : null;
+
     const updatedHabit = await this.prisma.habit.update({
-      where: { id },
+      where: { id: habitId },
       data: {
-        streak: newStreak,
-        longestStreak: newLongestStreak,
-        completionCount: newCompletionCount,
-        lastCompletedAt: newLastCompletedAt,
+        streak,
+        longestStreak,
+        completionCount,
+        lastCompletedAt,
       },
     });
 
@@ -257,7 +306,7 @@ export class HabitsService {
       userId,
       entityType: 'HABIT',
       entityId: updatedHabit.id,
-      action: existingCompletion ? 'UNCOMPLETED' : 'COMPLETED',
+      action: action,
       metadata: { title: updatedHabit.title },
     });
 

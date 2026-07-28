@@ -1,4 +1,3 @@
-import { lazy, Suspense } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { useDashboard } from '../hooks/use-dashboard';
 import { ProductivityCards } from './productivity-cards';
@@ -8,10 +7,6 @@ import { TaskListItem } from '@/features/tasks/components/task-list-item';
 import { HabitCard } from '@/features/habits/components/habit-card';
 import { Sparkles } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-
-const DashboardCharts = lazy(() =>
-  import('./dashboard-charts').then((m) => ({ default: m.DashboardCharts })),
-);
 
 export function Dashboard() {
   const { data: dashboard, isLoading, error } = useDashboard();
@@ -52,10 +47,6 @@ export function Dashboard() {
       />
 
       <ProductivityCards stats={stats} />
-
-      <Suspense fallback={<Skeleton className="h-64 rounded-xl" />}>
-        <DashboardCharts stats={stats} />
-      </Suspense>
 
       <RecentProjects projects={projects} />
 

@@ -32,13 +32,26 @@ function buildUrl(pathname: string, params?: ApiRequestOptions['params']): strin
   return url.toString();
 }
 
+function getCsrfToken(): string | undefined {
+  const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : undefined;
+}
+
 export async function apiClient<T>(pathname: string, options: ApiRequestOptions = {}): Promise<T> {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...(options.headers ?? {}),
+  };
+
+  const csrfToken = getCsrfToken();
+  if (csrfToken) {
+    (headers as Record<string, string>)['x-csrf-token'] = csrfToken;
+  }
+
   const response = await fetch(buildUrl(pathname, options.params), {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers ?? {}),
-    },
+    credentials: 'include',
+    headers,
   });
 
   if (!response.ok) {
