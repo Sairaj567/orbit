@@ -1,7 +1,7 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import type { Activity } from '@orbit/shared';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth } from '@/lib/auth-hooks';
 
 interface UseWorkspaceActivityOptions {
   workspaceId: string;

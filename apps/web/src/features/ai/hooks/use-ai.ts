@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth } from '@/lib/auth-hooks';
 import { aiClient } from '../api/ai.client';
 
 export function useGenerateSummary(workspaceId: string) {

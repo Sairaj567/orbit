@@ -11,15 +11,19 @@ interface ProvidersProps {
 }
 
 export function Providers({ children }: ProvidersProps) {
-  return (
-    <ClerkProvider publishableKey={env.clerkPublishableKey}>
-      <ThemeProvider>
-        <QueryProvider>
-          <ToastProvider>
-            <RealtimeProvider>{children}</RealtimeProvider>
-          </ToastProvider>
-        </QueryProvider>
-      </ThemeProvider>
-    </ClerkProvider>
+  const innerProviders = (
+    <ThemeProvider>
+      <QueryProvider>
+        <ToastProvider>
+          <RealtimeProvider>{children}</RealtimeProvider>
+        </ToastProvider>
+      </QueryProvider>
+    </ThemeProvider>
   );
+
+  if (env.authMode === 'clerk') {
+    return <ClerkProvider publishableKey={env.clerkPublishableKey}>{innerProviders}</ClerkProvider>;
+  }
+
+  return innerProviders;
 }

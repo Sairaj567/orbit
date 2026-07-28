@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth } from '@/lib/auth-hooks';
 import { WorkspacesClient, type WorkspaceWithRole } from '../api/workspaces.client';
 
 export const workspaceKeys = {

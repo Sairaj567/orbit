@@ -4,7 +4,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useUser } from '@clerk/clerk-react';
+import { useUser } from '@/lib/auth-hooks';
 import { useThemeStore } from '@/stores/theme.store';
 import { useUserProfile, useUpdateUserProfile } from '@/features/users/api/use-user-profile';
 

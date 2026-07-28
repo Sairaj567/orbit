@@ -1,8 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth } from '@/lib/auth-hooks';
 import { StudyBlocksClient } from '../api/study-blocks.client';
 import { useWorkspaceStore } from '@/stores';
-import type { CreateStudyBlockInput, UpdateStudyBlockInput, CompleteStudyBlockInput } from '@orbit/shared';
+import type {
+  CreateStudyBlockInput,
+  UpdateStudyBlockInput,
+  CompleteStudyBlockInput,
+} from '@orbit/shared';
 
 const QUERY_KEY = ['study-blocks', 'active'];
 

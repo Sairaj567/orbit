@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth } from '@/lib/auth-hooks';
 import { dashboardClient } from '../api/dashboard.client';
 import { useWorkspaceContext } from '@/components/layout/workspace-context';
 

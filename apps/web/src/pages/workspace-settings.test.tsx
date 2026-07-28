@@ -20,8 +20,8 @@ vi.mock('react-router', async () => {
   };
 });
 
-// Mock Clerk auth
-vi.mock('@clerk/clerk-react', () => ({
+// Mock auth hooks
+vi.mock('@/lib/auth-hooks', () => ({
   useAuth: () => ({
     getToken: vi.fn().mockResolvedValue('test_token'),
     isSignedIn: true,

@@ -1,11 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth } from '@/lib/auth-hooks';
 import { NotesClient } from '../api/notes.client';
 import type { CreateNoteInput, UpdateNoteInput, NoteQueryInput } from '@orbit/shared';
 
 export function useNotes(workspaceId: string, query?: NoteQueryInput) {
   const { getToken } = useAuth();
-  
+
   return useQuery({
     queryKey: ['workspaces', workspaceId, 'notes', query],
     queryFn: async () => {
@@ -19,7 +19,7 @@ export function useNotes(workspaceId: string, query?: NoteQueryInput) {
 
 export function useNote(workspaceId: string, noteId: string) {
   const { getToken } = useAuth();
-  
+
   return useQuery({
     queryKey: ['workspaces', workspaceId, 'notes', noteId],
     queryFn: async () => {

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth } from '@/lib/auth-hooks';
 import { TasksClient } from '../api/tasks.client';
 import type { CreateTaskInput, UpdateTaskInput, TaskQueryInput, Task } from '@orbit/shared';
 import type { PaginationMeta } from '../api/tasks.client';
@@ -7,14 +7,15 @@ import type { PaginationMeta } from '../api/tasks.client';
 export const taskKeys = {
   all: (workspaceId: string) => ['tasks', workspaceId] as const,
   lists: (workspaceId: string) => [...taskKeys.all(workspaceId), 'list'] as const,
-  list: (workspaceId: string, query: Partial<TaskQueryInput>) => [...taskKeys.lists(workspaceId), { query }] as const,
+  list: (workspaceId: string, query: Partial<TaskQueryInput>) =>
+    [...taskKeys.lists(workspaceId), { query }] as const,
   details: (workspaceId: string) => [...taskKeys.all(workspaceId), 'detail'] as const,
   detail: (workspaceId: string, id: string) => [...taskKeys.details(workspaceId), id] as const,
 };
 
 export function useTasks(workspaceId: string, query: Partial<TaskQueryInput> = {}) {
   const { getToken } = useAuth();
-  
+
   return useQuery({
     queryKey: taskKeys.list(workspaceId, query),
     queryFn: async () => {
@@ -28,7 +29,7 @@ export function useTasks(workspaceId: string, query: Partial<TaskQueryInput> = {
 
 export function useTask(workspaceId: string, id: string) {
   const { getToken } = useAuth();
-  
+
   return useQuery({
     queryKey: taskKeys.detail(workspaceId, id),
     queryFn: async () => {
@@ -53,25 +54,28 @@ export function useCreateTask(workspaceId: string) {
     onMutate: async (newTask) => {
       await queryClient.cancelQueries({ queryKey: taskKeys.lists(workspaceId) });
       const previousLists = queryClient.getQueriesData({ queryKey: taskKeys.lists(workspaceId) });
-      
-      queryClient.setQueriesData({ queryKey: taskKeys.lists(workspaceId) }, (old: { data: Task[]; meta: PaginationMeta } | undefined) => {
-        if (!old || !old.data) return old;
-        const optimisticTask = {
-          id: `temp-${Date.now()}`,
-          ...newTask,
-          status: newTask.status || 'TODO',
-          priority: newTask.priority || 'MEDIUM',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          workspaceId,
-          tags: newTask.tags || [],
-        };
-        return {
-          ...old,
-          data: [optimisticTask, ...old.data],
-          meta: { ...old.meta, total: (old.meta?.total || 0) + 1 }
-        };
-      });
+
+      queryClient.setQueriesData(
+        { queryKey: taskKeys.lists(workspaceId) },
+        (old: { data: Task[]; meta: PaginationMeta } | undefined) => {
+          if (!old || !old.data) return old;
+          const optimisticTask = {
+            id: `temp-${Date.now()}`,
+            ...newTask,
+            status: newTask.status || 'TODO',
+            priority: newTask.priority || 'MEDIUM',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            workspaceId,
+            tags: newTask.tags || [],
+          };
+          return {
+            ...old,
+            data: [optimisticTask, ...old.data],
+            meta: { ...old.meta, total: (old.meta?.total || 0) + 1 },
+          };
+        },
+      );
       return { previousLists };
     },
     onError: (_err, _newTask, context) => {
@@ -112,19 +116,25 @@ export function useUpdateTask(workspaceId: string) {
         });
       }
 
-      queryClient.setQueriesData({ queryKey: taskKeys.lists(workspaceId) }, (old: { data: Task[]; meta: PaginationMeta } | undefined) => {
-        if (!old || !old.data) return old;
-        return {
-          ...old,
-          data: old.data.map((task: Task) => task.id === id ? { ...task, ...data } : task)
-        };
-      });
+      queryClient.setQueriesData(
+        { queryKey: taskKeys.lists(workspaceId) },
+        (old: { data: Task[]; meta: PaginationMeta } | undefined) => {
+          if (!old || !old.data) return old;
+          return {
+            ...old,
+            data: old.data.map((task: Task) => (task.id === id ? { ...task, ...data } : task)),
+          };
+        },
+      );
 
       return { previousDetail, previousLists };
     },
     onError: (_err, _variables, context) => {
       if (context?.previousDetail) {
-        queryClient.setQueryData(taskKeys.detail(workspaceId, _variables.id), context.previousDetail);
+        queryClient.setQueryData(
+          taskKeys.detail(workspaceId, _variables.id),
+          context.previousDetail,
+        );
       }
       if (context?.previousLists) {
         context.previousLists.forEach(([queryKey, data]) => {
@@ -155,14 +165,17 @@ export function useDeleteTask(workspaceId: string) {
 
       const previousLists = queryClient.getQueriesData({ queryKey: taskKeys.lists(workspaceId) });
 
-      queryClient.setQueriesData({ queryKey: taskKeys.lists(workspaceId) }, (old: { data: Task[]; meta: PaginationMeta } | undefined) => {
-        if (!old || !old.data) return old;
-        return {
-          ...old,
-          data: old.data.filter((task: Task) => task.id !== id),
-          meta: { ...old.meta, total: Math.max(0, (old.meta?.total || 0) - 1) }
-        };
-      });
+      queryClient.setQueriesData(
+        { queryKey: taskKeys.lists(workspaceId) },
+        (old: { data: Task[]; meta: PaginationMeta } | undefined) => {
+          if (!old || !old.data) return old;
+          return {
+            ...old,
+            data: old.data.filter((task: Task) => task.id !== id),
+            meta: { ...old.meta, total: Math.max(0, (old.meta?.total || 0) - 1) },
+          };
+        },
+      );
 
       return { previousLists };
     },

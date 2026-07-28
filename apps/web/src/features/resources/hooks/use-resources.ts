@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth } from '@/lib/auth-hooks';
 import { ResourcesClient } from '../api/resources.client';
 import type { CreateResourceInput, ResourceQueryInput } from '@orbit/shared';
 import { useQuery } from '@tanstack/react-query';
@@ -7,12 +7,13 @@ import { useQuery } from '@tanstack/react-query';
 export const resourceKeys = {
   all: (workspaceId: string) => ['resources', workspaceId] as const,
   lists: (workspaceId: string) => [...resourceKeys.all(workspaceId), 'list'] as const,
-  list: (workspaceId: string, query: Partial<ResourceQueryInput>) => [...resourceKeys.lists(workspaceId), { query }] as const,
+  list: (workspaceId: string, query: Partial<ResourceQueryInput>) =>
+    [...resourceKeys.lists(workspaceId), { query }] as const,
 };
 
 export function useResources(workspaceId: string, query: Partial<ResourceQueryInput> = {}) {
   const { getToken } = useAuth();
-  
+
   return useQuery({
     queryKey: resourceKeys.list(workspaceId, query),
     queryFn: async () => {

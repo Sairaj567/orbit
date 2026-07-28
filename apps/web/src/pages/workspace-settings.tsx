@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { UserPlus } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth } from '@/lib/auth-hooks';
 import { useMembers } from '@/features/members/hooks/use-members';
 import { MemberList } from '@/features/members/components/MemberList';
 import { InviteMemberDialog } from '@/features/members/components/InviteMemberDialog';

@@ -56,6 +56,7 @@ services:
         VITE_API_URL: ${VITE_API_URL}
         VITE_WS_URL: ${VITE_WS_URL}
         VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY}
+        VITE_AUTH_MODE: ${VITE_AUTH_MODE}
     container_name: orbit-web
     restart: unless-stopped
     ports:

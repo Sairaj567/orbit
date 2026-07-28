@@ -7,8 +7,8 @@ import { useWorkspaceStore } from '@/stores/workspace.store';
 import * as workspaceHooks from '@/features/workspaces/hooks/use-workspaces';
 import type { WorkspaceWithRole } from '@/features/workspaces/api/workspaces.client';
 
-// Mock Clerk auth
-vi.mock('@clerk/clerk-react', () => ({
+// Mock auth hooks
+vi.mock('@/lib/auth-hooks', () => ({
   useAuth: () => ({
     getToken: vi.fn().mockResolvedValue('test_token'),
     isSignedIn: true,

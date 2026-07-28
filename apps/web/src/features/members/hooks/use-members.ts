@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { WorkspaceRole } from '@orbit/shared';
 import { MembersClient } from '@/api/members.client';
 import { useWorkspaceContext } from '@/components/layout/workspace-context';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth } from '@/lib/auth-hooks';
 
 export const membersKeys = {
   all: (workspaceId: string) => ['members', workspaceId] as const,
@@ -49,13 +49,7 @@ export function useUpdateMemberRole() {
   const { getToken } = useAuth();
 
   return useMutation({
-    mutationFn: async ({
-      memberId,
-      role,
-    }: {
-      memberId: string;
-      role: WorkspaceRole;
-    }) => {
+    mutationFn: async ({ memberId, role }: { memberId: string; role: WorkspaceRole }) => {
       const token = await getToken();
       return MembersClient.updateRole(workspaceId!, memberId, { role }, token!);
     },

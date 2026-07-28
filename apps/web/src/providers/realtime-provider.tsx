@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth } from '@/lib/auth-hooks';
 import { useWorkspaceStore } from '../stores/workspace.store';
 import { useProjectStore } from '../stores/project.store';
 import type { RealtimeEvent, RealtimePayload } from '@orbit/shared';

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ApiResponse, UpdateUserInput, User } from '@orbit/shared';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth } from '@/lib/auth-hooks';
 import { apiClient } from '@/lib/api-client';
 
 export function useUserProfile() {

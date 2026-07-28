@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth } from '@/lib/auth-hooks';
 import type { UpdateWorkspaceInput } from '@orbit/shared';
 import { WorkspacesClient, type WorkspaceWithRole } from '../api/workspaces.client';
 import { workspaceKeys } from './use-workspaces';

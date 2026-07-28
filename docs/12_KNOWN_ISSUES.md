@@ -64,3 +64,8 @@ This document tracks current limitations and known bugs in the system that do no
 
 - **Status:** Confirmed single-instance-only architecture.
 - **Impact:** `RealtimeGateway` manages active WebSockets in an in-memory map without `@socket.io/redis-adapter`. On a single-VM deployment, all clients connect to the single container instance. Expanding to multi-VM horizontal scaling requires configuring `socket.io-redis-adapter` to sync events across peer API instances via Redis pub/sub.
+
+### 11. Permanent Single-User LAN Deployment Authentication Architecture (`AUTH_MODE=dev_bypass`)
+
+- **Architecture Decision:** This deployment is configured as a single-user, LAN-only instance with `AUTH_MODE=dev_bypass`. The frontend completely bypasses `ClerkProvider` and real Clerk keys, sourcing user and auth context via `@/lib/auth-hooks`. The backend provisions a fixed local user identity (`dev_user_orbit`).
+- **Production Safety Rail:** The hard failure guard in `env.validation.ts` remains active: setting `AUTH_MODE=dev_bypass` when `NODE_ENV=production` causes an immediate fatal crash on backend startup to prevent accidental deployment to public environments without authentication.

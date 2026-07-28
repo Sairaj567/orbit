@@ -9,18 +9,28 @@ import * as workspaceHooks from '@/features/workspaces/hooks/use-workspaces';
 import * as dashboardHooks from '@/features/dashboard/hooks/use-dashboard';
 import * as notesHooks from '@/features/notes/hooks/use-notes';
 import * as projectsHooks from '@/features/projects/hooks/use-projects';
-import { lazy } from 'react';
 
-// Mock Clerk auth
+// Mock auth hooks (both Clerk and local seam so all components inherit auth context)
+const mockAuthObject = {
+  getToken: vi.fn().mockResolvedValue('test_token'),
+  isSignedIn: true,
+  isLoaded: true,
+  userId: 'user_demo_saira',
+};
+const mockUserObject = {
+  isLoaded: true,
+  isSignedIn: true,
+  user: { fullName: 'Saira', primaryEmailAddress: { emailAddress: 'saira@test.com' } },
+};
+
 vi.mock('@clerk/clerk-react', () => ({
-  useAuth: () => ({
-    getToken: vi.fn().mockResolvedValue('test_token'),
-    isSignedIn: true,
-    userId: 'user_demo_saira',
-  }),
-  useUser: () => ({
-    user: { fullName: 'Saira', primaryEmailAddress: { emailAddress: 'saira@test.com' } },
-  }),
+  useAuth: () => mockAuthObject,
+  useUser: () => mockUserObject,
+}));
+
+vi.mock('@/lib/auth-hooks', () => ({
+  useAuth: () => mockAuthObject,
+  useUser: () => mockUserObject,
 }));
 
 // Mock realtime sync hook
@@ -33,14 +43,16 @@ vi.mock('@/features/study-blocks/components', () => ({
   ActiveStudyWidget: () => null,
 }));
 
-// Mock command palette
-vi.mock('@/components/layout/command-palette', () => ({
+// Mock command palette (correct component import path)
+vi.mock('@/components/command-palette', () => ({
   CommandPalette: () => null,
 }));
 
+import type * as RechartsModule from 'recharts';
+
 // Mock Recharts responsive container to render in test environment
 vi.mock('recharts', async () => {
-  const actual = await vi.importActual<typeof import('recharts')>('recharts');
+  const actual = await vi.importActual<typeof RechartsModule>('recharts');
   return {
     ...actual,
     ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
@@ -71,14 +83,9 @@ const mockWorkspace = {
   updatedAt: '2026-07-26T00:00:00Z',
 };
 
-// Lazy loaded page components matching router.tsx
-const AnalyticsPage = lazy(() =>
-  import('@/pages/analytics').then((m) => ({ default: m.AnalyticsPage })),
-);
-const NotesPage = lazy(() => import('@/pages/notes').then((m) => ({ default: m.NotesPage })));
-const CalendarPage = lazy(() =>
-  import('@/pages/calendar').then((m) => ({ default: m.CalendarPage })),
-);
+import { AnalyticsPage } from '@/pages/analytics';
+import { NotesPage } from '@/pages/notes';
+import { CalendarPage } from '@/pages/calendar';
 
 describe('Route-Level Lazy Loading & Suspense Regression Test', () => {
   beforeEach(() => {

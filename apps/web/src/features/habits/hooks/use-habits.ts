@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth } from '@/lib/auth-hooks';
 import { HabitsClient } from '../api/habits.client';
 import type { HabitDTO, CreateHabitInput } from '@orbit/shared';
 
@@ -38,7 +38,11 @@ export function useCreateHabit(workspaceId: string, projectId: string) {
     mutationFn: async (data: CreateHabitInput) => {
       const token = await getToken();
       if (!token) throw new Error('Not authenticated');
-      return HabitsClient.create(workspaceId, { ...data, projectId } as CreateHabitInput & { projectId: string }, token);
+      return HabitsClient.create(
+        workspaceId,
+        { ...data, projectId } as CreateHabitInput & { projectId: string },
+        token,
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workspaces', workspaceId, 'habits'] });
@@ -58,7 +62,10 @@ export function useUpdateHabit(workspaceId: string) {
     },
     onSuccess: (updatedHabit) => {
       queryClient.invalidateQueries({ queryKey: ['workspaces', workspaceId, 'habits'] });
-      queryClient.setQueryData(['workspaces', workspaceId, 'habits', updatedHabit.id], updatedHabit);
+      queryClient.setQueryData(
+        ['workspaces', workspaceId, 'habits', updatedHabit.id],
+        updatedHabit,
+      );
     },
   });
 }
@@ -93,19 +100,30 @@ export function useToggleHabitComplete(workspaceId: string) {
       await queryClient.cancelQueries({ queryKey: ['workspaces', workspaceId, 'habits'] });
 
       // Basic optimistic update for the list
-      const previousHabits = queryClient.getQueryData<HabitDTO[]>(['workspaces', workspaceId, 'habits', { projectId: undefined }]);
-      
+      const previousHabits = queryClient.getQueryData<HabitDTO[]>([
+        'workspaces',
+        workspaceId,
+        'habits',
+        { projectId: undefined },
+      ]);
+
       // We could do precise optimistic updates here, but invalidation is safer for complex streak logic
-      
+
       return { previousHabits };
     },
     onSuccess: (updatedHabit) => {
       queryClient.invalidateQueries({ queryKey: ['workspaces', workspaceId, 'habits'] });
-      queryClient.setQueryData(['workspaces', workspaceId, 'habits', updatedHabit.id], updatedHabit);
+      queryClient.setQueryData(
+        ['workspaces', workspaceId, 'habits', updatedHabit.id],
+        updatedHabit,
+      );
     },
     onError: (_err, _newHabit, context) => {
       if (context?.previousHabits) {
-        queryClient.setQueryData(['workspaces', workspaceId, 'habits', { projectId: undefined }], context.previousHabits);
+        queryClient.setQueryData(
+          ['workspaces', workspaceId, 'habits', { projectId: undefined }],
+          context.previousHabits,
+        );
       }
     },
   });
